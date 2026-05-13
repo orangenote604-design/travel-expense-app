@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>申請一覧</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <div class="site-title">旅費申請システム</div>
+      <nav class="nav">
+        <a href="index.html">申請入力</a>
+        <a href="list.html" class="active">申請一覧</a>
+        <a href="members.html">部員一覧</a>
+        <a href="trips.html">旅行一覧</a>
+      </nav>
+    </div>
+  </header>
+  <main class="page">
+    <div class="container">
+      <h1 class="page-title">申請一覧</h1>
+      <div id="message" class="message"></div>
+      <section class="card">
+        <h2 class="card-title">検索条件</h2>
+        <div class="grid grid-3">
+          <div class="field"><label for="filterFiscalYear">年度</label><select id="filterFiscalYear"><option value="">すべて</option></select></div>
+          <div class="field"><label for="filterTripName">旅行名</label><select id="filterTripName"><option value="">すべて</option></select></div>
+          <div class="field"><label for="filterDriverName">運転者</label><select id="filterDriverName"><option value="">すべて</option></select></div>
+          <div class="field"><label for="filterPaidFlag">支払い状況</label><select id="filterPaidFlag"><option value="">すべて</option><option value="paid">支払い済み</option><option value="unpaid">未払い</option></select></div>
+          <div class="field"><label for="filterControlNo">管理番号</label><input type="text" id="filterControlNo" /></div>
+        </div>
+        <div class="button-row">
+          <button class="primary" type="button" id="searchButton">検索</button>
+          <button class="secondary" type="button" id="clearSearchButton">クリア</button>
+          <a href="index.html" class="button-link success">新規申請</a>
+        </div>
+      </section>
+      <section class="card">
+        <h2 class="card-title">集計</h2>
+        <div class="summary-box">
+          <div class="summary-item"><div class="note">件数</div><div id="summaryCount">0件</div></div>
+          <div class="summary-item"><div class="note">支給額合計</div><div id="summaryTotal">0円</div></div>
+        </div>
+      </section>
+      <section class="card">
+        <h2 class="card-title">一覧</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>管理番号</th><th>旅費発生日</th><th>年度</th><th>旅行名</th><th>運転者</th><th>出発地</th><th>到着地</th><th class="text-right">往路</th><th class="text-right">復路</th><th class="text-right">往復距離</th><th>その他内容</th><th class="text-right">支給額</th><th>支払い</th><th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="travelTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/list.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>部員一覧</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="site-header"><div class="container site-header-inner"><div class="site-title">旅費申請システム</div><nav class="nav"><a href="index.html">申請入力</a><a href="list.html">申請一覧</a><a href="members.html" class="active">部員一覧</a><a href="trips.html">旅行一覧</a></nav></div></header>
+  <main class="page"><div class="container"><h1 class="page-title">部員一覧</h1><div id="message" class="message"></div>
+    <section class="card"><h2 class="card-title">検索</h2><div class="grid grid-2"><div class="field"><label for="memberSearch">氏名</label><input type="text" id="memberSearch" /></div></div><div class="button-row"><button class="primary" type="button" id="searchMemberButton">検索</button><button class="secondary" type="button" id="clearMemberButton">クリア</button><a href="member-add.html" class="button-link success">部員追加</a></div></section>
+    <section class="card"><h2 class="card-title">一覧</h2><div class="table-wrap"><table><thead><tr><th>氏名</th><th>操作</th></tr></thead><tbody id="memberTableBody"></tbody></table></div></section>
+  </div></main>
+  <script src="js/config.js"></script><script src="js/api.js"></script><script src="js/common.js"></script><script src="js/members.js"></script>
+</body>
+</html>
