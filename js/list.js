@@ -20,7 +20,7 @@ function bindEvents() {
   document.getElementById('travelTableBody').addEventListener('click', handleTableClick);
   document.getElementById('travelTableBody').addEventListener('change', handleTableChange);
   document.getElementById('selectAllCheckbox').addEventListener('change', handleSelectAllChange);
-  document.getElementById('generateReceiptPdfButton').addEventListener('click', generateReceiptPdf);
+  document.getElementById('generateReceiptPdfButton').addEventListener('click', handleGenerateReceiptPdfClick);
   document.getElementById('markPaidButton').addEventListener('click', markSelectedAsPaid);
 }
 
@@ -285,34 +285,53 @@ function buildReceiptPrintHtml(records) {
 </html>`;
 }
 
-async function generateReceiptPdf() {
-  clearMessage();
+function handleGenerateReceiptPdfClick() {
   const records = getSelectedRecords();
+  clearMessage();
   if (!records.length) {
     setMessage('受領証PDFを生成する申請を選択してください。', 'warning');
     return;
   }
 
-  const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+  const printWindow = window.open('about:blank', '_blank');
   if (!printWindow) {
-    setMessage('ポップアップがブロックされました。ポップアップを許可して再実行してください。', 'error');
+    setMessage('新しいタブを開けませんでした。ブラウザ設定や拡張機能をご確認ください。', 'error');
     return;
   }
 
+  try {
+    printWindow.document.open();
+    printWindow.document.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>受領証を準備中</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;padding:24px;color:#111827;} .loading{display:flex;align-items:center;gap:12px;font-weight:700;} .spinner{width:18px;height:18px;border:3px solid #dbeafe;border-top-color:#2563eb;border-radius:50%;animation:spin 0.9s linear infinite;} @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style></head><body><div class="loading"><div class="spinner"></div><div>受領証を準備中...</div></div></body></html>');
+    printWindow.document.close();
+  } catch (error) {
+    console.error(error);
+  }
+
+  generateReceiptPdf(records, printWindow);
+}
+
+async function generateReceiptPdf(records, printWindow) {
   try {
     setLoading(true, '受領証PDFを表示中...');
     printWindow.document.open();
     printWindow.document.write(buildReceiptPrintHtml(records));
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-    }, 300);
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+      }, 200);
+    };
     setMessage(`${records.length}件分の受領証を表示しました。印刷画面で「PDFとして保存」を選択してください。`, 'success');
   } catch (error) {
     setMessage('受領証PDFの表示に失敗しました。', 'error');
     console.error(error);
-    printWindow.close();
+    try {
+      printWindow.close();
+    } catch (closeError) {
+      console.error(closeError);
+    }
   } finally {
     setLoading(false);
   }
