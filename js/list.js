@@ -190,12 +190,59 @@ function formatDistanceValue(value) {
   return `${toNumber(value).toLocaleString('ja-JP')}km`;
 }
 
-function buildReceiptPdfContainer(records) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'pdf-receipt-sheet';
-  wrapper.innerHTML = `
-    <div class="pdf-receipt-title">宍粟市野球部旅費受領証</div>
-    <table class="pdf-receipt-table">
+function buildReceiptPrintHtml(records) {
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>宍粟市野球部旅費受領証</title>
+  <style>
+    @page { size: A4 landscape; margin: 10mm; }
+    body {
+      margin: 0;
+      color: #111827;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .sheet {
+      width: 100%;
+    }
+    .title {
+      text-align: center;
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0 0 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 11px;
+    }
+    th, td {
+      border: 1px solid #4b5563;
+      padding: 6px 4px;
+      text-align: center;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+    th {
+      background: #f3f4f6;
+      font-weight: 700;
+    }
+    .text-right {
+      text-align: right;
+    }
+    .signature-box {
+      min-height: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <h1 class="title">宍粟市野球部旅費受領証</h1>
+    <table>
       <thead>
         <tr>
           <th>旅行発生日</th>
@@ -233,8 +280,9 @@ function buildReceiptPdfContainer(records) {
         `).join('')}
       </tbody>
     </table>
-  `;
-  return wrapper;
+  </div>
+</body>
+</html>`;
 }
 
 async function generateReceiptPdf() {
@@ -244,30 +292,28 @@ async function generateReceiptPdf() {
     setMessage('受領証PDFを生成する申請を選択してください。', 'warning');
     return;
   }
-  if (typeof window.html2pdf !== 'function') {
-    setMessage('PDF生成ライブラリの読み込みに失敗しました。ページを再読み込みしてください。', 'error');
+
+  const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+  if (!printWindow) {
+    setMessage('ポップアップがブロックされました。ポップアップを許可して再実行してください。', 'error');
     return;
   }
 
-  const wrapper = buildReceiptPdfContainer(records);
-  document.body.appendChild(wrapper);
-
   try {
-    setLoading(true, '受領証PDFを生成中...');
-    await window.html2pdf().set({
-      filename: '宍粟市野球部旅費受領証.pdf',
-      margin: [8, 8, 8, 8],
-      pagebreak: { mode: ['css', 'legacy'] },
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-    }).from(wrapper).save();
-    setMessage(`${records.length}件分の受領証PDFを生成しました。`, 'success');
+    setLoading(true, '受領証PDFを表示中...');
+    printWindow.document.open();
+    printWindow.document.write(buildReceiptPrintHtml(records));
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 300);
+    setMessage(`${records.length}件分の受領証を表示しました。印刷画面で「PDFとして保存」を選択してください。`, 'success');
   } catch (error) {
-    setMessage('受領証PDFの生成に失敗しました。', 'error');
+    setMessage('受領証PDFの表示に失敗しました。', 'error');
     console.error(error);
+    printWindow.close();
   } finally {
-    wrapper.remove();
     setLoading(false);
   }
 }
