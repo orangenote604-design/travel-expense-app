@@ -1,10 +1,15 @@
 let tripList = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('searchTripButton').addEventListener('click', renderTrips);
-  document.getElementById('clearTripButton').addEventListener('click', clearSearch);
-  document.getElementById('tripTableBody').addEventListener('click', handleTableClick);
-  await loadTrips();
+  setLoading(true, '画面を読み込み中...');
+  try {
+    document.getElementById('searchTripButton').addEventListener('click', renderTrips);
+    document.getElementById('clearTripButton').addEventListener('click', clearSearch);
+    document.getElementById('tripTableBody').addEventListener('click', handleTableClick);
+    await loadTrips();
+  } finally {
+    setLoading(false);
+  }
 });
 
 async function loadTrips() {

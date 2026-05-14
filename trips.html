@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>旅行一覧</title><link rel="stylesheet" href="css/style.css" /></head>
 <body>
+<div id="loadingOverlay" class="loading-overlay show"><div class="loading-panel"><div class="loading-spinner"></div><div id="loadingOverlayText">画面を読み込み中...</div></div></div>
 <header class="site-header"><div class="container site-header-inner"><div class="site-title">旅費申請システム</div><nav class="nav"><a href="index.html">申請入力</a><a href="list.html">申請一覧</a><a href="members.html">部員一覧</a><a href="trips.html" class="active">旅行一覧</a></nav></div></header>
 <main class="page"><div class="container"><h1 class="page-title">旅行一覧</h1><div id="message" class="message"></div>
 <section class="card"><h2 class="card-title">検索</h2><div class="grid grid-2"><div class="field"><label for="tripSearch">旅行名</label><input type="text" id="tripSearch" /></div></div><div class="button-row"><button class="primary" type="button" id="searchTripButton">検索</button><button class="secondary" type="button" id="clearTripButton">クリア</button><a href="trip-add.html" class="button-link success">旅行追加</a></div></section>

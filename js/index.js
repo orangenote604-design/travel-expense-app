@@ -4,9 +4,14 @@ let tripMasterList = [];
 let currentRecordSnapshot = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
-  bindEvents();
-  await loadInitialData();
-  await initForm();
+  setLoading(true, '画面を読み込み中...');
+  try {
+    bindEvents();
+    await loadInitialData();
+    await initForm();
+  } finally {
+    setLoading(false);
+  }
 });
 
 function bindEvents() {

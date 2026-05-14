@@ -3,9 +3,14 @@ let allMembers = [];
 let allTrips = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
-  bindEvents();
-  await loadData();
-  showFlashMessage();
+  setLoading(true, '画面を読み込み中...');
+  try {
+    bindEvents();
+    await loadData();
+    showFlashMessage();
+  } finally {
+    setLoading(false);
+  }
 });
 
 function bindEvents() {

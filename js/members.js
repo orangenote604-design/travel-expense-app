@@ -1,10 +1,15 @@
 let memberList = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
-  document.getElementById('searchMemberButton').addEventListener('click', renderMembers);
-  document.getElementById('clearMemberButton').addEventListener('click', clearSearch);
-  document.getElementById('memberTableBody').addEventListener('click', handleTableClick);
-  await loadMembers();
+  setLoading(true, '画面を読み込み中...');
+  try {
+    document.getElementById('searchMemberButton').addEventListener('click', renderMembers);
+    document.getElementById('clearMemberButton').addEventListener('click', clearSearch);
+    document.getElementById('memberTableBody').addEventListener('click', handleTableClick);
+    await loadMembers();
+  } finally {
+    setLoading(false);
+  }
 });
 
 async function loadMembers() {
