@@ -69,6 +69,10 @@ button.primary:hover, .button-link.primary:hover { background: var(--primary-dar
 button.secondary, .button-link.secondary { background: #e5e7eb; color: var(--text); }
 button.success, .button-link.success { background: var(--success); color: #fff; }
 button.danger, .button-link.danger { background: var(--danger); color: #fff; }
+button:disabled, .button-link.disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+}
 .message { display: none; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; font-weight: 600; }
 .message.show { display: block; }
 .message.info { background: #e8f0ff; color: #1d4ed8; }
@@ -123,8 +127,73 @@ body.is-loading { cursor: progress; }
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+.selection-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.selection-actions {
+  margin-top: 0;
+}
+.selection-status {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+.checkbox-cell {
+  width: 52px;
+  min-width: 52px;
+  text-align: center;
+}
+.checkbox-cell input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+.pdf-receipt-sheet {
+  position: fixed;
+  left: -20000px;
+  top: 0;
+  width: 1500px;
+  padding: 28px;
+  background: #ffffff;
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
+}
+.pdf-receipt-title {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+.pdf-receipt-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+.pdf-receipt-table th,
+.pdf-receipt-table td {
+  border: 1px solid #4b5563;
+  padding: 6px 4px;
+  text-align: center;
+  vertical-align: middle;
+  word-break: break-word;
+}
+.pdf-receipt-table th {
+  background: #f3f4f6;
+}
+.pdf-receipt-table tr {
+  page-break-inside: avoid;
+}
+.signature-box {
+  min-height: 28px;
+}
 @media (max-width: 768px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   .site-header-inner { flex-direction: column; align-items: flex-start; }
   .inline-check { padding-top: 0; }
+  .selection-toolbar { align-items: stretch; }
 }
