@@ -5,12 +5,21 @@ let allTrips = [];
 document.addEventListener('DOMContentLoaded', async () => {
   bindEvents();
   await loadData();
+  showFlashMessage();
 });
 
 function bindEvents() {
   document.getElementById('searchButton').addEventListener('click', renderTable);
   document.getElementById('clearSearchButton').addEventListener('click', clearFilters);
   document.getElementById('travelTableBody').addEventListener('click', handleTableClick);
+}
+
+function showFlashMessage() {
+  const created = getQueryParam('created');
+  if (created) {
+    setMessage(`登録しました。管理番号: ${created}`, 'success');
+    history.replaceState(null, '', 'list.html');
+  }
 }
 
 async function loadData() {
@@ -65,7 +74,6 @@ function getFilteredRecords() {
 }
 
 function renderTable() {
-  clearMessage();
   const rows = getFilteredRecords();
   const tbody = document.getElementById('travelTableBody');
 
@@ -106,6 +114,7 @@ async function handleTableClick(event) {
   if (!confirm(`管理番号 ${controlNo} を削除しますか？`)) return;
 
   try {
+    setLoading(true, '削除中...');
     const result = await apiPost({ action: 'deleteTravel', controlNo });
     if (!result.ok) {
       setMessage(result.error || '削除に失敗しました。', 'error');
@@ -116,5 +125,7 @@ async function handleTableClick(event) {
   } catch (error) {
     setMessage('削除時に通信エラーが発生しました。', 'error');
     console.error(error);
+  } finally {
+    setLoading(false);
   }
 }

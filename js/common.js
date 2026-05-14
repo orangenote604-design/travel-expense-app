@@ -83,3 +83,23 @@ function fillSimpleSelect(selectId, items, valueKey = null, labelKey = null) {
     select.appendChild(option);
   });
 }
+
+function ensureLoadingOverlay() {
+  let overlay = document.getElementById('loadingOverlay');
+  if (overlay) return overlay;
+
+  overlay = document.createElement('div');
+  overlay.id = 'loadingOverlay';
+  overlay.className = 'loading-overlay';
+  overlay.innerHTML = '<div class="loading-panel"><div class="loading-spinner"></div><div id="loadingOverlayText">処理中...</div></div>';
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function setLoading(isLoading, text = '処理中...') {
+  const overlay = ensureLoadingOverlay();
+  const textEl = document.getElementById('loadingOverlayText');
+  if (textEl) textEl.textContent = text;
+  overlay.classList.toggle('show', !!isLoading);
+  document.body.classList.toggle('is-loading', !!isLoading);
+}

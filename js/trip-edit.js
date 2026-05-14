@@ -65,6 +65,7 @@ async function updateTrip(event) {
     return;
   }
   try {
+    setLoading(true, '更新中...');
     const result = await apiPost({ action: 'updateTrip', oldTripName, data: payload });
     if (!result.ok) {
       setMessage(result.error || '更新に失敗しました。', 'error');
@@ -76,6 +77,8 @@ async function updateTrip(event) {
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
     console.error(error);
+  } finally {
+    setLoading(false);
   }
 }
 
@@ -88,6 +91,7 @@ async function deleteTrip() {
   }
   if (!confirm(`旅行「${tripName}」を削除しますか？`)) return;
   try {
+    setLoading(true, '削除中...');
     const result = await apiPost({ action: 'deleteTrip', tripName });
     if (!result.ok) {
       setMessage(result.error || '削除に失敗しました。', 'error');
@@ -97,5 +101,7 @@ async function deleteTrip() {
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
     console.error(error);
+  } finally {
+    setLoading(false);
   }
 }

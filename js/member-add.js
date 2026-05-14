@@ -11,6 +11,7 @@ async function submitMember(event) {
     return;
   }
   try {
+    setLoading(true, '登録中...');
     const result = await apiPost({ action: 'addMember', name });
     if (!result.ok) {
       setMessage(result.error || '登録に失敗しました。', 'error');
@@ -21,5 +22,7 @@ async function submitMember(event) {
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
     console.error(error);
+  } finally {
+    setLoading(false);
   }
 }

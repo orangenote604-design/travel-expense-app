@@ -129,6 +129,7 @@ function findSelectedTrip() {
 
 function handleTripChange() {
   const trip = findSelectedTrip();
+  currentRecordSnapshot = null;
   fillTripFields(trip);
 }
 
@@ -159,7 +160,7 @@ function updateFeeFieldsByDistance() {
   if (manualMode) {
     driverAllowanceInput.readOnly = false;
     gasolineFeeInput.readOnly = false;
-    if (!editMode || !currentRecordSnapshot || currentRecordSnapshot.tripName !== document.getElementById('tripName').value) {
+    if (!editMode || !currentRecordSnapshot) {
       driverAllowanceInput.value = driverAllowanceInput.value || 0;
       gasolineFeeInput.value = gasolineFeeInput.value || 0;
     }
@@ -179,9 +180,7 @@ function updateFeeFieldsByDistance() {
 function handleOtherFeeChange() {
   const otherFee = toNumber(document.getElementById('otherFee').value);
   document.getElementById('otherDetailField').classList.toggle('hidden', otherFee <= 0);
-  if (otherFee <= 0) {
-    document.getElementById('otherDetail').value = '';
-  }
+  if (otherFee <= 0) document.getElementById('otherDetail').value = '';
   updatePaymentAmount();
 }
 
@@ -234,6 +233,7 @@ async function submitForm(event) {
   }
 
   try {
+    setLoading(true, editMode ? '更新中...' : '登録中...');
     const result = await apiPost(editMode
       ? { action: 'updateTravel', controlNo: currentControlNo, data: payload }
       : { action: 'createTravel', data: payload });
@@ -243,20 +243,20 @@ async function submitForm(event) {
       return;
     }
 
+    if (!editMode) {
+      location.href = `list.html?created=${encodeURIComponent(result.controlNo)}`;
+      return;
+    }
+
     document.getElementById('controlNo').value = result.controlNo;
     document.getElementById('fiscalYear').value = result.fiscalYear;
     document.getElementById('roundTripDistance').value = result.roundTripDistance;
     document.getElementById('paymentAmount').value = result.paymentAmount;
-    setMessage(editMode ? `更新しました。管理番号: ${result.controlNo}` : `登録しました。管理番号: ${result.controlNo}`, 'success');
-
-    if (!editMode) {
-      currentControlNo = result.controlNo;
-      editMode = true;
-      document.getElementById('pageTitle').textContent = '旅費申請編集';
-      document.getElementById('submitButton').textContent = '更新する';
-    }
+    setMessage(`更新しました。管理番号: ${result.controlNo}`, 'success');
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
     console.error(error);
+  } finally {
+    setLoading(false);
   }
 }

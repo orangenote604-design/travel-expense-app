@@ -26,12 +26,10 @@ function renderMembers() {
   const keyword = document.getElementById('memberSearch').value.trim().toLowerCase();
   const rows = memberList.filter(name => !keyword || String(name).toLowerCase().includes(keyword));
   const tbody = document.getElementById('memberTableBody');
-
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="2">データがありません。</td></tr>';
     return;
   }
-
   tbody.innerHTML = rows.map(name => `
     <tr>
       <td>${escapeHtml(name)}</td>
@@ -44,8 +42,8 @@ async function handleTableClick(event) {
   if (!button) return;
   const name = button.dataset.name;
   if (!confirm(`部員「${name}」を削除しますか？`)) return;
-
   try {
+    setLoading(true, '削除中...');
     const result = await apiPost({ action: 'deleteMember', name });
     if (!result.ok) {
       setMessage(result.error || '削除に失敗しました。', 'error');
@@ -56,5 +54,7 @@ async function handleTableClick(event) {
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
     console.error(error);
+  } finally {
+    setLoading(false);
   }
 }

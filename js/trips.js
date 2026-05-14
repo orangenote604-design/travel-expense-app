@@ -26,12 +26,10 @@ function renderTrips() {
   const keyword = document.getElementById('tripSearch').value.trim().toLowerCase();
   const rows = tripList.filter(item => !keyword || String(item.tripName).toLowerCase().includes(keyword));
   const tbody = document.getElementById('tripTableBody');
-
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="9">データがありません。</td></tr>';
     return;
   }
-
   tbody.innerHTML = rows.map(item => {
     const actualReturnDistance = item.separateReturn ? toNumber(item.returnDistance) : toNumber(item.outboundDistance);
     return `
@@ -55,6 +53,7 @@ async function handleTableClick(event) {
   const tripName = button.dataset.tripName;
   if (!confirm(`旅行「${tripName}」を削除しますか？`)) return;
   try {
+    setLoading(true, '削除中...');
     const result = await apiPost({ action: 'deleteTrip', tripName });
     if (!result.ok) {
       setMessage(result.error || '削除に失敗しました。', 'error');
@@ -65,5 +64,7 @@ async function handleTableClick(event) {
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
     console.error(error);
+  } finally {
+    setLoading(false);
   }
 }

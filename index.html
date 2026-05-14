@@ -28,122 +28,49 @@
         <section class="card">
           <h2 class="card-title">基本情報</h2>
           <div class="grid grid-2">
-            <div class="field">
-              <label for="travelDate">旅費発生日</label>
-              <input type="date" id="travelDate" required />
-            </div>
-            <div class="field">
-              <label for="fiscalYear">年度</label>
-              <input type="text" id="fiscalYear" readonly />
-            </div>
-            <div class="field">
-              <label for="controlNo">管理番号</label>
-              <input type="text" id="controlNo" readonly />
-            </div>
-            <div class="field">
-              <label for="tripName">旅行名</label>
-              <select id="tripName" required>
-                <option value="">選択してください</option>
-              </select>
-            </div>
-            <div class="field">
-              <label for="driverName">運転者</label>
-              <select id="driverName" required>
-                <option value="">選択してください</option>
-              </select>
-            </div>
+            <div class="field"><label for="travelDate">旅費発生日</label><input type="date" id="travelDate" required /></div>
+            <div class="field"><label for="fiscalYear">年度</label><input type="text" id="fiscalYear" readonly /></div>
+            <div class="field"><label for="controlNo">管理番号</label><input type="text" id="controlNo" readonly /></div>
+            <div class="field"><label for="tripName">旅行名</label><select id="tripName" required><option value="">選択してください</option></select></div>
+            <div class="field"><label for="driverName">運転者</label><select id="driverName" required><option value="">選択してください</option></select></div>
           </div>
         </section>
 
         <section class="card">
           <h2 class="card-title">旅行情報（旅行マスタから自動入力）</h2>
           <div class="grid grid-2">
-            <div class="field">
-              <label for="departureFrom">出発地</label>
-              <input type="text" id="departureFrom" readonly />
-            </div>
-            <div class="field">
-              <label for="arrivalTo">到着地</label>
-              <input type="text" id="arrivalTo" readonly />
-            </div>
-            <div class="field">
-              <label for="returnFrom">帰路出発地</label>
-              <input type="text" id="returnFrom" readonly />
-            </div>
-            <div class="field">
-              <label for="returnTo">帰路到着地</label>
-              <input type="text" id="returnTo" readonly />
-            </div>
-            <div class="field field-span-2">
-              <label for="routeNote">経由地等補足</label>
-              <textarea id="routeNote" readonly></textarea>
-            </div>
-            <div class="field">
-              <label for="outboundDistance">往路距離</label>
-              <input type="number" id="outboundDistance" step="0.1" min="0" readonly />
-            </div>
-            <div class="field inline-check">
-              <input type="checkbox" id="separateReturn" disabled />
-              <label for="separateReturn">復路距離を個別入力する</label>
-            </div>
-            <div class="field" id="returnDistanceField">
-              <label for="returnDistance">復路距離</label>
-              <input type="number" id="returnDistance" step="0.1" min="0" readonly />
-            </div>
-            <div class="field">
-              <label for="roundTripDistance">往復距離</label>
-              <input type="number" id="roundTripDistance" class="amount-box" readonly />
-            </div>
+            <div class="field"><label for="departureFrom">出発地</label><input type="text" id="departureFrom" readonly /></div>
+            <div class="field"><label for="arrivalTo">到着地</label><input type="text" id="arrivalTo" readonly /></div>
+            <div class="field"><label for="returnFrom">帰路出発地</label><input type="text" id="returnFrom" readonly /></div>
+            <div class="field"><label for="returnTo">帰路到着地</label><input type="text" id="returnTo" readonly /></div>
+            <div class="field field-span-2"><label for="routeNote">経由地等補足</label><textarea id="routeNote" readonly></textarea></div>
+            <div class="field"><label for="outboundDistance">往路距離</label><input type="number" id="outboundDistance" step="0.1" min="0" readonly /></div>
+            <div class="field inline-check"><input type="checkbox" id="separateReturn" disabled /><label for="separateReturn">復路距離を個別入力する</label></div>
+            <div class="field hidden" id="returnDistanceField"><label for="returnDistance">復路距離</label><input type="number" id="returnDistance" step="0.1" min="0" readonly /></div>
+            <div class="field"><label for="roundTripDistance">往復距離</label><input type="number" id="roundTripDistance" class="amount-box" readonly /></div>
           </div>
         </section>
 
         <section class="card">
           <h2 class="card-title">費用情報</h2>
           <div class="grid grid-2">
-            <div class="field">
-              <label for="driverAllowance">運転手当</label>
-              <input type="number" id="driverAllowance" readonly />
-            </div>
-            <div class="field">
-              <label for="gasolineFee">ガソリン代</label>
-              <input type="number" id="gasolineFee" readonly />
-            </div>
-            <div class="field">
-              <label for="parkingFee">駐車場利用料</label>
-              <input type="number" id="parkingFee" min="0" step="1" value="0" />
-            </div>
-            <div class="field">
-              <label for="tollFee">高速道路利用料</label>
-              <input type="number" id="tollFee" min="0" step="1" value="0" />
-            </div>
-            <div class="field">
-              <label for="otherFee">その他</label>
-              <input type="number" id="otherFee" min="0" step="1" value="0" />
-            </div>
-            <div class="field" id="otherDetailField">
-              <label for="otherDetail">その他内容</label>
-              <input type="text" id="otherDetail" />
-            </div>
-            <div class="field">
-              <label for="paymentAmount">支給額</label>
-              <input type="number" id="paymentAmount" class="amount-box" readonly />
-            </div>
+            <div class="field"><label for="driverAllowance">運転手当</label><input type="number" id="driverAllowance" readonly /></div>
+            <div class="field"><label for="gasolineFee">ガソリン代</label><input type="number" id="gasolineFee" readonly /></div>
+            <div class="field"><label for="parkingFee">駐車場利用料</label><input type="number" id="parkingFee" min="0" step="1" value="0" /></div>
+            <div class="field"><label for="tollFee">高速道路利用料</label><input type="number" id="tollFee" min="0" step="1" value="0" /></div>
+            <div class="field"><label for="otherFee">その他</label><input type="number" id="otherFee" min="0" step="1" value="0" /></div>
+            <div class="field hidden" id="otherDetailField"><label for="otherDetail">その他内容</label><input type="text" id="otherDetail" /></div>
+            <div class="field"><label for="paymentAmount">支給額</label><input type="number" id="paymentAmount" class="amount-box" readonly /></div>
           </div>
-          <p class="note" id="manualFeeNote">往復距離の四捨五入値が301km以上の場合、運転手当とガソリン代は手入力です。</p>
+          <p class="note hidden" id="manualFeeNote">往復距離の四捨五入値が301km以上の場合、運転手当とガソリン代は手入力です。</p>
         </section>
 
         <section class="card">
           <h2 class="card-title">補足</h2>
           <div class="grid grid-2">
-            <div class="field inline-check">
-              <input type="checkbox" id="paidFlag" />
-              <label for="paidFlag">支払い済み</label>
-            </div>
+            <div class="field inline-check"><input type="checkbox" id="paidFlag" /><label for="paidFlag">支払い済み</label></div>
             <div></div>
-            <div class="field field-span-2">
-              <label for="remarks">備考</label>
-              <textarea id="remarks"></textarea>
-            </div>
+            <div class="field field-span-2"><label for="remarks">備考</label><textarea id="remarks"></textarea></div>
           </div>
         </section>
 
