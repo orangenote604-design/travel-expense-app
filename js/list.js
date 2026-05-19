@@ -34,11 +34,17 @@ function showFlashMessage() {
 
 async function loadData() {
   try {
-    const [records, members, trips] = await Promise.all([apiGet('listTravel'), apiGet('listMembers'), apiGet('listTrips')]);
+    const [records, members, trips] = await Promise.all([
+      apiGet('listTravel'),
+      apiGet('listMembers'),
+      apiGet('listTrips')
+    ]);
     allTravelRecords = records;
     allMembers = members;
     allTrips = trips;
-    selectedControlNos = new Set([...selectedControlNos].filter(controlNo => allTravelRecords.some(item => item.controlNo === controlNo)));
+    selectedControlNos = new Set(
+      [...selectedControlNos].filter(controlNo => allTravelRecords.some(item => item.controlNo === controlNo))
+    );
     populateFilters();
     renderTable();
   } catch (error) {
@@ -56,6 +62,7 @@ function populateFilters() {
 
 function handleSearch() {
   selectedControlNos.clear();
+  clearReceiptResult();
   renderTable();
 }
 
@@ -66,6 +73,7 @@ function clearFilters() {
   document.getElementById('filterPaidFlag').value = '';
   document.getElementById('filterControlNo').value = '';
   selectedControlNos.clear();
+  clearReceiptResult();
   renderTable();
 }
 
@@ -182,156 +190,68 @@ function getSelectedRecords() {
     .sort((a, b) => new Date(a.travelDate) - new Date(b.travelDate) || String(a.controlNo).localeCompare(String(b.controlNo), 'ja'));
 }
 
-function formatMoneyValue(value) {
-  return `${toNumber(value).toLocaleString('ja-JP')}円`;
+function clearReceiptResult() {
+  const container = document.getElementById('receiptResult');
+  if (!container) return;
+  container.className = 'receipt-result hidden';
+  container.innerHTML = '';
 }
 
-function formatDistanceValue(value) {
-  return `${toNumber(value).toLocaleString('ja-JP')}km`;
+function renderReceiptResult(result) {
+  const container = document.getElementById('receiptResult');
+  if (!container) return;
+
+  const missing = Array.isArray(result.missingControlNos) && result.missingControlNos.length
+    ? `<div class="receipt-result-note">未取得の管理番号: ${escapeHtml(result.missingControlNos.join(', '))}</div>`
+    : '';
+
+  const folderLink = result.folderUrl
+    ? `<a href="${escapeHtml(result.folderUrl)}" target="_blank" rel="noopener">保存先フォルダを開く</a>`
+    : '';
+
+  container.className = 'receipt-result';
+  container.innerHTML = `
+    <div class="receipt-result-title">受領証PDFを生成しました</div>
+    <div class="receipt-result-meta">ファイル名: ${escapeHtml(result.fileName || '')}${result.createdAt ? ` / 生成日時: ${escapeHtml(result.createdAt)}` : ''}</div>
+    <div class="receipt-result-links">
+      <a href="${escapeHtml(result.viewUrl || result.fileUrl || '#')}" target="_blank" rel="noopener">PDFを開く</a>
+      <a href="${escapeHtml(result.downloadUrl || result.viewUrl || '#')}" target="_blank" rel="noopener">PDFをダウンロード</a>
+      ${folderLink}
+    </div>
+    <div class="receipt-result-note">PDFはGoogle Driveに保存されています。必要に応じて上のリンクから開いてください。</div>
+    ${missing}
+  `;
 }
 
-function buildReceiptPrintHtml(records) {
-  return `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8" />
-  <title>宍粟市野球部旅費受領証</title>
-  <style>
-    @page { size: A4 landscape; margin: 10mm; }
-    body {
-      margin: 0;
-      color: #111827;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", Meiryo, sans-serif;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    .sheet {
-      width: 100%;
-    }
-    .title {
-      text-align: center;
-      font-size: 24px;
-      font-weight: 700;
-      margin: 0 0 14px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      font-size: 11px;
-    }
-    th, td {
-      border: 1px solid #4b5563;
-      padding: 6px 4px;
-      text-align: center;
-      vertical-align: middle;
-      word-break: break-word;
-    }
-    th {
-      background: #f3f4f6;
-      font-weight: 700;
-    }
-    .text-right {
-      text-align: right;
-    }
-    .signature-box {
-      min-height: 30px;
-    }
-  </style>
-</head>
-<body>
-  <div class="sheet">
-    <h1 class="title">宍粟市野球部旅費受領証</h1>
-    <table>
-      <thead>
-        <tr>
-          <th>旅行発生日</th>
-          <th>管理番号</th>
-          <th>旅行名</th>
-          <th>会場名</th>
-          <th>往復距離</th>
-          <th>運転手当</th>
-          <th>ガソリン代</th>
-          <th>駐車場利用料</th>
-          <th>高速道路利用料</th>
-          <th>その他</th>
-          <th>支給額</th>
-          <th>運転者</th>
-          <th>受領印又は署名</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${records.map(record => `
-          <tr>
-            <td>${escapeHtml(normalizeDateValue(record.travelDate))}</td>
-            <td>${escapeHtml(record.controlNo)}</td>
-            <td>${escapeHtml(record.tripName)}</td>
-            <td>${escapeHtml(record.arrivalTo || '')}</td>
-            <td class="text-right">${escapeHtml(formatDistanceValue(record.roundTripDistance))}</td>
-            <td class="text-right">${escapeHtml(formatMoneyValue(record.driverAllowance))}</td>
-            <td class="text-right">${escapeHtml(formatMoneyValue(record.gasolineFee))}</td>
-            <td class="text-right">${escapeHtml(formatMoneyValue(record.parkingFee))}</td>
-            <td class="text-right">${escapeHtml(formatMoneyValue(record.tollFee))}</td>
-            <td class="text-right">${escapeHtml(formatMoneyValue(record.otherFee))}</td>
-            <td class="text-right">${escapeHtml(formatMoneyValue(record.paymentAmount))}</td>
-            <td>${escapeHtml(record.driverName)}</td>
-            <td><div class="signature-box"></div></td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-  </div>
-</body>
-</html>`;
-}
-
-function handleGenerateReceiptPdfClick() {
-  const records = getSelectedRecords();
+async function handleGenerateReceiptPdfClick() {
   clearMessage();
+  clearReceiptResult();
+
+  const records = getSelectedRecords();
   if (!records.length) {
     setMessage('受領証PDFを生成する申請を選択してください。', 'warning');
     return;
   }
 
-  const printWindow = window.open('about:blank', '_blank');
-  if (!printWindow) {
-    setMessage('新しいタブを開けませんでした。ブラウザ設定や拡張機能をご確認ください。', 'error');
-    return;
-  }
+  if (!confirm(`選択した ${records.length} 件の受領証PDFを生成しますか？`)) return;
 
   try {
-    printWindow.document.open();
-    printWindow.document.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>受領証を準備中</title><style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;padding:24px;color:#111827;} .loading{display:flex;align-items:center;gap:12px;font-weight:700;} .spinner{width:18px;height:18px;border:3px solid #dbeafe;border-top-color:#2563eb;border-radius:50%;animation:spin 0.9s linear infinite;} @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style></head><body><div class="loading"><div class="spinner"></div><div>受領証を準備中...</div></div></body></html>');
-    printWindow.document.close();
-  } catch (error) {
-    console.error(error);
-  }
+    setLoading(true, '受領証PDFを生成中...');
+    const result = await apiPost({
+      action: 'generateReceiptPdf',
+      controlNos: records.map(item => item.controlNo)
+    });
 
-  generateReceiptPdf(records, printWindow);
-}
-
-async function generateReceiptPdf(records, printWindow) {
-  try {
-    setLoading(true, '受領証PDFを表示中...');
-    printWindow.document.open();
-    printWindow.document.write(buildReceiptPrintHtml(records));
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-      }, 200);
-    };
-    setMessage(`${records.length}件分の受領証を表示しました。印刷画面で「PDFとして保存」を選択してください。`, 'success');
-  } catch (error) {
-    setMessage('受領証PDFの表示に失敗しました。', 'error');
-    console.error(error);
-    try {
-      printWindow.close();
-    } catch (closeError) {
-      console.error(closeError);
+    if (!result.ok) {
+      setMessage(result.error || '受領証PDFの生成に失敗しました。', 'error');
+      return;
     }
+
+    renderReceiptResult(result);
+    setMessage(`${result.recordCount}件分の受領証PDFを生成しました。`, 'success');
+  } catch (error) {
+    setMessage('受領証PDF生成時に通信エラーが発生しました。', 'error');
+    console.error(error);
   } finally {
     setLoading(false);
   }
@@ -384,6 +304,7 @@ async function handleTableClick(event) {
       return;
     }
     selectedControlNos.delete(controlNo);
+    clearReceiptResult();
     setMessage(`削除しました。管理番号: ${controlNo}`, 'success');
     await loadData();
   } catch (error) {
