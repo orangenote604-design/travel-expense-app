@@ -69,6 +69,45 @@ button.primary:hover, .button-link.primary:hover { background: var(--primary-dar
 button.secondary, .button-link.secondary { background: #e5e7eb; color: var(--text); }
 button.success, .button-link.success { background: var(--success); color: #fff; }
 button.danger, .button-link.danger { background: var(--danger); color: #fff; }
+.manual-beta-button {
+  margin-left: auto;
+  white-space: nowrap;
+  gap: 8px;
+  background: #fff7ed !important;
+  color: #b45309 !important;
+  border: 1px solid #fdba74;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35);
+}
+.manual-beta-button:hover {
+  background: #ffedd5 !important;
+  color: #9a3412 !important;
+}
+.manual-beta-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.manual-beta-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ea580c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+.manual-beta-note {
+  margin-top: 4px;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 600;
+}
 button:disabled, .button-link.disabled {
   opacity: 0.56;
   cursor: not-allowed;
