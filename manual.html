@@ -14,19 +14,15 @@
       padding: 24px 0 40px;
     }
     .manual-sheet {
-      width: min(100%, 1280px);
+      width: min(100%, 1440px);
       margin: 0 auto 24px;
       background: #ffffff;
       border: 1px solid #d9e0ea;
       border-radius: 18px;
       box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
       padding: 32px 28px 24px;
-      page-break-after: always;
-      break-after: page;
     }
     .manual-sheet:last-child {
-      page-break-after: auto;
-      break-after: auto;
     }
     .manual-cover {
       display: grid;
@@ -214,28 +210,29 @@
     .manual-frame-stage {
       position: relative;
       background: #ffffff;
-      overflow: hidden;
-      height: 390px;
+      overflow: auto;
+      height: 720px;
     }
     .manual-frame-stage.tall {
-      height: 470px;
+      height: 900px;
     }
     .manual-frame-stage.medium {
-      height: 430px;
+      height: 760px;
     }
     .manual-frame-stage.short {
-      height: 330px;
+      height: 620px;
     }
     .manual-frame-stage iframe {
-      width: 1440px;
+      width: 100%;
+      min-width: 1280px;
       height: 1200px;
       border: 0;
-      transform: scale(0.50);
+      transform: none;
       transform-origin: top left;
-      pointer-events: none;
+      pointer-events: auto;
       display: block;
-      margin-right: -720px;
-      margin-bottom: -600px;
+      margin: 0;
+      background: #ffffff;
     }
     .manual-badge {
       position: absolute;
@@ -250,6 +247,8 @@
       font-size: 14px;
       font-weight: 800;
       box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+      z-index: 2;
+      pointer-events: none;
     }
     .manual-legend {
       display: grid;
@@ -325,6 +324,14 @@
       color: #64748b;
       font-size: 11px;
     }
+    .manual-frame-help {
+      padding: 10px 12px;
+      border-top: 1px solid #d9e0ea;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 12px;
+      line-height: 1.7;
+    }
     .manual-highlight-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -386,7 +393,10 @@
       .manual-frame-stage.medium,
       .manual-frame-stage.tall,
       .manual-frame-stage.short {
-        height: 360px;
+        height: 520px;
+      }
+      .manual-frame-stage iframe {
+        min-width: 1100px;
       }
     }
     @media print {
@@ -561,6 +571,7 @@
             <div class="manual-badge" style="top:108px;left:36px;">3</div>
             <div class="manual-badge" style="top:430px;left:28px;">4</div>
           </div>
+          <div class="manual-frame-help">この画面部分はスクロールできます。下方向にスクロールすると、実際の画面の続きまで確認できます。</div>
         </div>
         <div class="manual-section-stack">
           <div class="manual-card">
@@ -596,6 +607,7 @@
             <div class="manual-badge" style="top:530px;left:26px;">4</div>
             <div class="manual-badge" style="top:654px;left:26px;">5</div>
           </div>
+          <div class="manual-frame-help">申請入力画面は縦に長いため、この枠内をスクロールしながら確認してください。</div>
         </div>
         <div class="manual-section-stack">
           <div class="manual-card">
@@ -670,6 +682,7 @@
             <div class="manual-badge" style="top:316px;left:26px;">3</div>
             <div class="manual-badge" style="top:394px;left:26px;">4</div>
           </div>
+          <div class="manual-frame-help">検索条件の下に一覧テーブルがあります。必要に応じてこの枠内をスクロールして確認してください。</div>
         </div>
         <div class="manual-section-stack">
           <div class="manual-card">
@@ -707,6 +720,7 @@
             <div class="manual-badge" style="top:112px;left:650px;">2</div>
             <div class="manual-badge" style="top:196px;left:20px;">3</div>
           </div>
+          <div class="manual-frame-help">テーブル部分は横にも縦にも確認できるよう、実画面のまま表示しています。</div>
         </div>
         <div class="manual-section-stack">
           <div class="manual-card">
@@ -738,6 +752,7 @@
             <div class="manual-badge" style="top:108px;left:28px;">1</div>
             <div class="manual-badge" style="top:72px;left:680px;">2</div>
           </div>
+          <div class="manual-frame-help">複数選択後の一括操作ボタンは一覧上部にあります。必要に応じて画面を上下にスクロールして位置を確認してください。</div>
         </div>
         <div class="manual-section-stack">
           <div class="manual-card">
@@ -773,6 +788,7 @@
             <div class="manual-badge" style="top:108px;left:28px;">1</div>
             <div class="manual-badge" style="top:72px;left:862px;">2</div>
           </div>
+          <div class="manual-frame-help">支払い済み更新ボタンも実画面そのままで表示しています。枠内スクロールで周辺の情報も確認できます。</div>
         </div>
         <div class="manual-section-stack">
           <div class="manual-card">
@@ -804,12 +820,14 @@
             <div class="manual-frame-stage short">
               <iframe src="members.html" title="部員一覧画面"></iframe>
             </div>
+            <div class="manual-frame-help">部員一覧も実画面です。検索欄と一覧表をそのまま確認できます。</div>
           </div>
           <div class="manual-frame-wrap">
             <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 部員追加画面</div>
             <div class="manual-frame-stage short">
               <iframe src="member-add.html" title="部員追加画面"></iframe>
             </div>
+            <div class="manual-frame-help">追加画面では入力欄とボタン配置を実際の画面で確認できます。</div>
           </div>
         </div>
         <div class="manual-section-stack">
@@ -842,12 +860,14 @@
             <div class="manual-frame-stage short">
               <iframe src="trips.html" title="旅行一覧画面"></iframe>
             </div>
+            <div class="manual-frame-help">旅行一覧も実画面です。列が多いので横幅の広い表示になっています。</div>
           </div>
           <div class="manual-frame-wrap">
             <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 旅行追加画面</div>
             <div class="manual-frame-stage short">
               <iframe src="trip-add.html" title="旅行追加画面"></iframe>
             </div>
+            <div class="manual-frame-help">旅行追加画面は縦長です。必要に応じてスクロールして全項目を確認してください。</div>
           </div>
         </div>
         <div class="manual-section-stack">
