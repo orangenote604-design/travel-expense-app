@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>操作マニュアル | 旅費申請システム</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    body.manual-body {
+      background: #eef2f7;
+    }
+    .manual-page {
+      padding: 24px 0 40px;
+    }
+    .manual-sheet {
+      width: min(100%, 297mm);
+      min-height: 190mm;
+      margin: 0 auto 24px;
+      background: #ffffff;
+      border: 1px solid #d9e0ea;
+      border-radius: 18px;
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+      padding: 18mm 16mm 14mm;
+      page-break-after: always;
+      break-after: page;
+    }
+    .manual-sheet:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+    .manual-cover {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 20px;
+      align-items: center;
+      min-height: 155mm;
+    }
+    .manual-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #e8f0ff;
+      color: #1d4ed8;
+      font-weight: 700;
+      font-size: 13px;
+    }
+    .manual-cover-title {
+      font-size: 34px;
+      line-height: 1.25;
+      margin: 14px 0 10px;
+    }
+    .manual-cover-subtitle {
+      font-size: 16px;
+      color: #4b5563;
+      line-height: 1.8;
+      margin: 0 0 18px;
+    }
+    .manual-meta-list {
+      display: grid;
+      gap: 10px;
+    }
+    .manual-meta-item {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #f8fafc;
+      border: 1px solid #d9e0ea;
+    }
+    .manual-meta-label {
+      font-weight: 700;
+      color: #475569;
+    }
+    .manual-preview-card {
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      border: 1px solid #d9e0ea;
+      border-radius: 18px;
+      padding: 14px;
+    }
+    .manual-preview-stack {
+      display: grid;
+      gap: 12px;
+    }
+    .manual-mini-shot {
+      border: 1px solid #d9e0ea;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .manual-mini-shot iframe {
+      width: 1440px;
+      height: 900px;
+      border: 0;
+      transform: scale(0.26);
+      transform-origin: top left;
+      pointer-events: none;
+      margin-bottom: -666px;
+      margin-right: -1065px;
+      display: block;
+    }
+    .manual-page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 10px;
+      margin-bottom: 16px;
+    }
+    .manual-page-title {
+      font-size: 24px;
+      margin: 0;
+    }
+    .manual-page-number {
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      padding-top: 6px;
+    }
+    .manual-toc {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+    .manual-toc-item {
+      border: 1px solid #d9e0ea;
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: #f8fafc;
+    }
+    .manual-toc-item strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #1d4ed8;
+    }
+    .manual-grid {
+      display: grid;
+      grid-template-columns: 1.45fr 0.95fr;
+      gap: 18px;
+      align-items: start;
+    }
+    .manual-grid.equal {
+      grid-template-columns: 1fr 1fr;
+    }
+    .manual-section-stack {
+      display: grid;
+      gap: 14px;
+    }
+    .manual-card {
+      border: 1px solid #d9e0ea;
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: #ffffff;
+    }
+    .manual-card h3,
+    .manual-card h4 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .manual-card p,
+    .manual-card li {
+      font-size: 13px;
+      line-height: 1.8;
+      color: #334155;
+    }
+    .manual-card ul,
+    .manual-card ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .manual-note {
+      border-left: 4px solid #f59e0b;
+      background: #fff7ed;
+    }
+    .manual-danger {
+      border-left: 4px solid #dc2626;
+      background: #fef2f2;
+    }
+    .manual-success {
+      border-left: 4px solid #16a34a;
+      background: #f0fdf4;
+    }
+    .manual-frame-wrap {
+      border: 1px solid #d9e0ea;
+      border-radius: 16px;
+      background: #ffffff;
+      overflow: hidden;
+      position: relative;
+    }
+    .manual-frame-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border-bottom: 1px solid #d9e0ea;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .manual-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #cbd5e1;
+    }
+    .manual-dot.red { background: #f87171; }
+    .manual-dot.yellow { background: #fbbf24; }
+    .manual-dot.green { background: #4ade80; }
+    .manual-frame-stage {
+      position: relative;
+      background: #ffffff;
+      overflow: hidden;
+      height: 390px;
+    }
+    .manual-frame-stage.tall {
+      height: 470px;
+    }
+    .manual-frame-stage.medium {
+      height: 430px;
+    }
+    .manual-frame-stage.short {
+      height: 330px;
+    }
+    .manual-frame-stage iframe {
+      width: 1440px;
+      height: 1200px;
+      border: 0;
+      transform: scale(0.50);
+      transform-origin: top left;
+      pointer-events: none;
+      display: block;
+      margin-right: -720px;
+      margin-bottom: -600px;
+    }
+    .manual-badge {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+    }
+    .manual-legend {
+      display: grid;
+      gap: 8px;
+    }
+    .manual-legend-item {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      align-items: start;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .manual-legend-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+    }
+    .manual-two-shots {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .manual-shot-caption {
+      padding: 10px 12px;
+      border-top: 1px solid #d9e0ea;
+      font-size: 12px;
+      color: #475569;
+      background: #f8fafc;
+      font-weight: 700;
+    }
+    .manual-step-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .manual-step-table th,
+    .manual-step-table td {
+      border: 1px solid #d9e0ea;
+      padding: 8px 10px;
+      vertical-align: top;
+      line-height: 1.7;
+    }
+    .manual-step-table th {
+      background: #eff6ff;
+      width: 92px;
+      text-align: left;
+    }
+    .manual-inline-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .manual-tag {
+      display: inline-flex;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .manual-footer-note {
+      margin-top: 10px;
+      text-align: right;
+      color: #64748b;
+      font-size: 11px;
+    }
+    @media (max-width: 1200px) {
+      .manual-grid,
+      .manual-grid.equal,
+      .manual-cover,
+      .manual-toc,
+      .manual-two-shots {
+        grid-template-columns: 1fr;
+      }
+      .manual-frame-stage,
+      .manual-frame-stage.medium,
+      .manual-frame-stage.tall,
+      .manual-frame-stage.short {
+        height: 360px;
+      }
+    }
+    @media print {
+      body.manual-body {
+        background: #ffffff;
+      }
+      .site-header,
+      .manual-top-actions {
+        display: none !important;
+      }
+      .manual-page {
+        padding: 0;
+      }
+      .manual-sheet {
+        box-shadow: none;
+        margin: 0;
+        border: none;
+      }
+    }
+  </style>
+</head>
+<body class="manual-body">
+  <header class="site-header">
+    <div class="container site-header-inner">
+      <div class="site-title">旅費申請システム</div>
+      <nav class="nav">
+        <a href="index.html">申請入力</a>
+        <a href="list.html">申請一覧</a>
+        <a href="members.html">部員一覧</a>
+        <a href="trips.html">旅行一覧</a>
+      </nav>
+      <a href="index.html" class="button-link primary" style="margin-left:auto;white-space:nowrap;">システムへ戻る</a>
+    </div>
+  </header>
+
+  <main class="manual-page">
+    <section class="manual-sheet">
+      <div class="manual-cover">
+        <div>
+          <div class="manual-kicker">操作マニュアル / Version 1.0.2</div>
+          <h1 class="manual-cover-title">宍粟市野球部<br>旅費申請システム<br>操作マニュアル</h1>
+          <p class="manual-cover-subtitle">実際のシステム画面をそのまま確認しながら、申請登録・一覧確認・受領証PDF出力・マスタ管理までの基本操作を順番に確認できるHTMLマニュアルです。</p>
+          <div class="manual-meta-list">
+            <div class="manual-meta-item"><div class="manual-meta-label">対象バージョン</div><div>1.0.2</div></div>
+            <div class="manual-meta-item"><div class="manual-meta-label">対象ユーザー</div><div>旅費申請を行う担当者 / 一覧管理を行う担当者 / 部員・旅行マスタを管理する担当者</div></div>
+            <div class="manual-meta-item"><div class="manual-meta-label">主な機能</div><div>申請入力、申請一覧、受領証PDF出力、支払い済み一括更新、部員一覧、旅行一覧</div></div>
+          </div>
+        </div>
+        <div class="manual-preview-card">
+          <div class="manual-preview-stack">
+            <div class="manual-mini-shot"><iframe src="index.html" title="申請入力画面"></iframe></div>
+            <div class="manual-mini-shot"><iframe src="list.html" title="申請一覧画面"></iframe></div>
+            <div class="manual-mini-shot"><iframe src="trips.html" title="旅行一覧画面"></iframe></div>
+          </div>
+        </div>
+      </div>
+      <div class="manual-footer-note">このマニュアルはシステム画面と同じHTML/CSS/JSを前提に構成しています。</div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">1. 目次</h2>
+        <div class="manual-page-number">Page 1</div>
+      </div>
+      <div class="manual-toc">
+        <div class="manual-toc-item"><strong>2. システム概要</strong>旅費申請システムでできること、画面構成、利用の流れを確認します。</div>
+        <div class="manual-toc-item"><strong>3. 画面共通の見方</strong>ヘッダー、共通ボタン、読み込み表示、メッセージ表示の見方を確認します。</div>
+        <div class="manual-toc-item"><strong>4. 申請入力（全体像）</strong>基本情報、旅行情報、費用情報、補足の構成を確認します。</div>
+        <div class="manual-toc-item"><strong>5. 申請入力（登録手順）</strong>実際に登録する手順と、入力時の注意点を確認します。</div>
+        <div class="manual-toc-item"><strong>6. 申請一覧（検索・集計）</strong>検索条件、集計、一覧テーブルの見方を確認します。</div>
+        <div class="manual-toc-item"><strong>7. 申請一覧（編集・削除・複数選択）</strong>個別編集・削除と複数選択の操作を確認します。</div>
+        <div class="manual-toc-item"><strong>8. 受領証PDF出力</strong>複数申請をまとめて受領証PDFとして出力する方法を確認します。</div>
+        <div class="manual-toc-item"><strong>9. 支払い済み一括更新</strong>選択した申請をまとめて支払い済みに更新する方法を確認します。</div>
+        <div class="manual-toc-item"><strong>10. 部員一覧</strong>部員マスタの検索・追加・編集・削除を確認します。</div>
+        <div class="manual-toc-item"><strong>11. 旅行一覧</strong>旅行マスタの検索・追加・編集・削除を確認します。</div>
+      </div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">2. システム概要</h2>
+        <div class="manual-page-number">Page 2</div>
+      </div>
+      <div class="manual-grid equal">
+        <div class="manual-card">
+          <h3>このシステムでできること</h3>
+          <ul>
+            <li>旅費申請の新規登録・編集・削除</li>
+            <li>旅行マスタからの経路・距離の自動反映</li>
+            <li>支給額の自動計算</li>
+            <li>申請一覧からの検索・集計・一括操作</li>
+            <li>受領証PDFの出力</li>
+            <li>部員一覧・旅行一覧のマスタ管理</li>
+          </ul>
+          <div class="manual-inline-list">
+            <span class="manual-tag">申請入力</span>
+            <span class="manual-tag">申請一覧</span>
+            <span class="manual-tag">部員一覧</span>
+            <span class="manual-tag">旅行一覧</span>
+            <span class="manual-tag">受領証PDF</span>
+          </div>
+        </div>
+        <div class="manual-card manual-success">
+          <h3>基本的な利用の流れ</h3>
+          <table class="manual-step-table">
+            <tr><th>手順1</th><td>部員一覧・旅行一覧に必要なマスタを登録します。</td></tr>
+            <tr><th>手順2</th><td>申請入力で旅費申請を登録します。</td></tr>
+            <tr><th>手順3</th><td>申請一覧で検索・確認・編集・削除を行います。</td></tr>
+            <tr><th>手順4</th><td>必要に応じて複数選択し、受領証PDFを出力します。</td></tr>
+            <tr><th>手順5</th><td>支払い後、申請一覧から支払い済みフラグをまとめて更新します。</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="manual-card" style="margin-top:16px;">
+        <h3>主要画面</h3>
+        <div class="manual-two-shots">
+          <div class="manual-mini-shot"><iframe src="index.html" title="申請入力画面"></iframe><div class="manual-shot-caption">申請入力：旅費申請を登録する画面</div></div>
+          <div class="manual-mini-shot"><iframe src="list.html" title="申請一覧画面"></iframe><div class="manual-shot-caption">申請一覧：検索・集計・一括操作を行う画面</div></div>
+          <div class="manual-mini-shot"><iframe src="members.html" title="部員一覧画面"></iframe><div class="manual-shot-caption">部員一覧：運転者候補を管理する画面</div></div>
+          <div class="manual-mini-shot"><iframe src="trips.html" title="旅行一覧画面"></iframe><div class="manual-shot-caption">旅行一覧：旅行マスタを管理する画面</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">3. 画面共通の見方</h2>
+        <div class="manual-page-number">Page 3</div>
+      </div>
+      <div class="manual-grid">
+        <div class="manual-frame-wrap">
+          <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 申請入力画面（共通UIの見方）</div>
+          <div class="manual-frame-stage medium">
+            <iframe src="index.html" title="共通UI説明用画面"></iframe>
+            <div class="manual-badge" style="top:18px;left:22px;">1</div>
+            <div class="manual-badge" style="top:18px;left:312px;">2</div>
+            <div class="manual-badge" style="top:108px;left:36px;">3</div>
+            <div class="manual-badge" style="top:430px;left:28px;">4</div>
+          </div>
+        </div>
+        <div class="manual-section-stack">
+          <div class="manual-card">
+            <h3>共通の見方</h3>
+            <div class="manual-legend">
+              <div class="manual-legend-item"><div class="manual-legend-number">1</div><div><strong>システム名</strong><br>左上に常に「旅費申請システム」が表示されます。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">2</div><div><strong>画面切替メニュー</strong><br>申請入力・申請一覧・部員一覧・旅行一覧を切り替えます。右上の「操作マニュアル」ボタンからこのマニュアルを開けます。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">3</div><div><strong>メッセージ表示</strong><br>登録完了・更新失敗などの結果がページ上部に表示されます。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">4</div><div><strong>操作ボタン</strong><br>青は主操作、灰は補助操作、緑は追加、赤は削除に使われます。</div></div>
+            </div>
+          </div>
+          <div class="manual-card manual-note">
+            <h3>読み込み中の表示</h3>
+            <p>画面を開いた直後や登録・更新・削除の実行中は、薄いグレーのオーバーレイとスピナーが表示されます。処理が完了するまでそのままお待ちください。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">4. 申請入力（全体像）</h2>
+        <div class="manual-page-number">Page 4</div>
+      </div>
+      <div class="manual-grid">
+        <div class="manual-frame-wrap">
+          <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 申請入力画面</div>
+          <div class="manual-frame-stage tall">
+            <iframe src="index.html" title="申請入力画面"></iframe>
+            <div class="manual-badge" style="top:84px;left:26px;">1</div>
+            <div class="manual-badge" style="top:196px;left:26px;">2</div>
+            <div class="manual-badge" style="top:364px;left:26px;">3</div>
+            <div class="manual-badge" style="top:530px;left:26px;">4</div>
+            <div class="manual-badge" style="top:654px;left:26px;">5</div>
+          </div>
+        </div>
+        <div class="manual-section-stack">
+          <div class="manual-card">
+            <h3>各エリアの役割</h3>
+            <div class="manual-legend">
+              <div class="manual-legend-item"><div class="manual-legend-number">1</div><div><strong>基本情報</strong><br>旅費発生日・年度・管理番号・旅行名・運転者を設定します。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">2</div><div><strong>旅行情報</strong><br>旅行マスタから出発地、到着地、距離などが自動入力されます。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">3</div><div><strong>費用情報</strong><br>運転手当・ガソリン代は距離に応じて自動計算され、駐車場利用料などを追加できます。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">4</div><div><strong>補足</strong><br>支払い済みフラグや備考を入力します。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">5</div><div><strong>登録ボタン</strong><br>入力内容を登録し、完了後は申請一覧へ自動で移動します。</div></div>
+            </div>
+          </div>
+          <div class="manual-card manual-note">
+            <h3>自動入力される項目</h3>
+            <ul>
+              <li>年度：旅費発生日から自動計算</li>
+              <li>管理番号：登録時に自動採番</li>
+              <li>旅行情報：旅行名に対応するマスタから自動反映</li>
+              <li>支給額：各費用の合計から自動計算</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">5. 申請入力（登録手順・注意点）</h2>
+        <div class="manual-page-number">Page 5</div>
+      </div>
+      <div class="manual-grid equal">
+        <div class="manual-card">
+          <h3>登録手順</h3>
+          <table class="manual-step-table">
+            <tr><th>手順1</th><td>「旅費発生日」を入力します。年度は自動で表示されます。</td></tr>
+            <tr><th>手順2</th><td>「旅行名」を選択します。旅行情報が自動入力されます。</td></tr>
+            <tr><th>手順3</th><td>「運転者」を選択します。</td></tr>
+            <tr><th>手順4</th><td>必要に応じて「駐車場利用料」「高速道路利用料」「その他」を入力します。</td></tr>
+            <tr><th>手順5</th><td>「その他」を入力した場合は「その他内容」も入力します。</td></tr>
+            <tr><th>手順6</th><td>「登録する」をクリックします。登録完了後は申請一覧へ自動で移動します。</td></tr>
+          </table>
+        </div>
+        <div class="manual-section-stack">
+          <div class="manual-card manual-note">
+            <h3>注意1：その他内容の入力</h3>
+            <p>「その他」の金額が0円より大きい場合は、「その他内容」の入力が必須です。未入力のままでは登録できません。</p>
+          </div>
+          <div class="manual-card manual-note">
+            <h3>注意2：301km以上の扱い</h3>
+            <p>往復距離の四捨五入値が301km以上の場合、運転手当とガソリン代は自動計算ではなく手入力になります。画面に注意メッセージが表示されます。</p>
+          </div>
+          <div class="manual-card manual-success">
+            <h3>登録後の動き</h3>
+            <p>登録が完了すると、登録完了メッセージとともに申請一覧へ自動遷移します。追加された申請は一覧の先頭付近に表示されます。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">6. 申請一覧（検索・集計・一覧の見方）</h2>
+        <div class="manual-page-number">Page 6</div>
+      </div>
+      <div class="manual-grid">
+        <div class="manual-frame-wrap">
+          <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 申請一覧画面</div>
+          <div class="manual-frame-stage tall">
+            <iframe src="list.html" title="申請一覧画面"></iframe>
+            <div class="manual-badge" style="top:84px;left:26px;">1</div>
+            <div class="manual-badge" style="top:214px;left:26px;">2</div>
+            <div class="manual-badge" style="top:316px;left:26px;">3</div>
+            <div class="manual-badge" style="top:394px;left:26px;">4</div>
+          </div>
+        </div>
+        <div class="manual-section-stack">
+          <div class="manual-card">
+            <h3>各エリアの見方</h3>
+            <div class="manual-legend">
+              <div class="manual-legend-item"><div class="manual-legend-number">1</div><div><strong>検索条件</strong><br>年度、旅行名、運転者、支払い状況、管理番号で絞り込みできます。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">2</div><div><strong>集計</strong><br>現在表示中の件数・支給額合計・選択件数が確認できます。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">3</div><div><strong>一括操作</strong><br>チェックした申請に対して受領証PDF出力、支払い済み一括更新を行います。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">4</div><div><strong>一覧テーブル</strong><br>申請内容の確認、編集、削除ができます。</div></div>
+            </div>
+          </div>
+          <div class="manual-card manual-success">
+            <h3>検索の使い方</h3>
+            <ul>
+              <li>条件を選んで「検索」をクリックすると絞り込みます。</li>
+              <li>「クリア」で検索条件を初期化します。</li>
+              <li>管理番号は部分一致で検索できます。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">7. 申請一覧（編集・削除・複数選択）</h2>
+        <div class="manual-page-number">Page 7</div>
+      </div>
+      <div class="manual-grid equal">
+        <div class="manual-frame-wrap">
+          <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 一覧テーブルの操作</div>
+          <div class="manual-frame-stage medium">
+            <iframe src="list.html" title="申請一覧テーブル"></iframe>
+            <div class="manual-badge" style="top:112px;left:28px;">1</div>
+            <div class="manual-badge" style="top:112px;left:650px;">2</div>
+            <div class="manual-badge" style="top:196px;left:20px;">3</div>
+          </div>
+        </div>
+        <div class="manual-section-stack">
+          <div class="manual-card">
+            <h3>操作内容</h3>
+            <div class="manual-legend">
+              <div class="manual-legend-item"><div class="manual-legend-number">1</div><div><strong>チェックボックス</strong><br>個別選択、またはヘッダーの全選択で複数の申請をまとめて選択できます。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">2</div><div><strong>編集 / 削除</strong><br>各行から個別に編集・削除できます。削除時は確認メッセージが表示されます。</div></div>
+              <div class="manual-legend-item"><div class="manual-legend-number">3</div><div><strong>一覧確認</strong><br>管理番号、旅費発生日、旅行名、運転者、距離、支給額、支払い状況を横断的に確認できます。</div></div>
+            </div>
+          </div>
+          <div class="manual-card manual-danger">
+            <h3>削除時の注意</h3>
+            <p>削除した申請データは一覧から消えます。必要な場合は削除前に内容を確認してください。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">8. 受領証PDF出力</h2>
+        <div class="manual-page-number">Page 8</div>
+      </div>
+      <div class="manual-grid">
+        <div class="manual-frame-wrap">
+          <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 受領証PDF出力の操作</div>
+          <div class="manual-frame-stage medium">
+            <iframe src="list.html" title="受領証PDF出力の操作"></iframe>
+            <div class="manual-badge" style="top:108px;left:28px;">1</div>
+            <div class="manual-badge" style="top:72px;left:680px;">2</div>
+          </div>
+        </div>
+        <div class="manual-section-stack">
+          <div class="manual-card">
+            <h3>出力手順</h3>
+            <table class="manual-step-table">
+              <tr><th>手順1</th><td>受領証に含めたい申請をチェックします。</td></tr>
+              <tr><th>手順2</th><td>「選択分の受領証PDFを生成」をクリックします。</td></tr>
+              <tr><th>手順3</th><td>生成完了後、PDFを開く / ダウンロードします。</td></tr>
+            </table>
+          </div>
+          <div class="manual-card manual-success">
+            <h3>受領証の特徴</h3>
+            <ul>
+              <li>複数の申請をまとめて1つの受領証PDFにできます。</li>
+              <li>旅行発生日、管理番号、旅行名、会場名、各費用、支給額、運転者、受領印又は署名欄が出力されます。</li>
+              <li>内部的には「受領証出力」シートを使ってPDFを生成しています。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">9. 支払い済み一括更新</h2>
+        <div class="manual-page-number">Page 9</div>
+      </div>
+      <div class="manual-grid equal">
+        <div class="manual-frame-wrap">
+          <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 支払い済み一括更新の操作</div>
+          <div class="manual-frame-stage medium">
+            <iframe src="list.html" title="支払い済み一括更新"></iframe>
+            <div class="manual-badge" style="top:108px;left:28px;">1</div>
+            <div class="manual-badge" style="top:72px;left:862px;">2</div>
+          </div>
+        </div>
+        <div class="manual-section-stack">
+          <div class="manual-card">
+            <h3>更新手順</h3>
+            <table class="manual-step-table">
+              <tr><th>手順1</th><td>支払い済みにしたい申請をチェックします。</td></tr>
+              <tr><th>手順2</th><td>「選択分を支払い済みにする」をクリックします。</td></tr>
+              <tr><th>手順3</th><td>確認メッセージで内容を確認し、更新を実行します。</td></tr>
+              <tr><th>手順4</th><td>一覧の「支払い」欄が「済」に変わります。</td></tr>
+            </table>
+          </div>
+          <div class="manual-card manual-note">
+            <h3>注意</h3>
+            <p>一括更新は選択中の申請すべてに適用されます。対象をよく確認してから実行してください。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">10. 部員一覧</h2>
+        <div class="manual-page-number">Page 10</div>
+      </div>
+      <div class="manual-grid equal">
+        <div class="manual-section-stack">
+          <div class="manual-frame-wrap">
+            <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 部員一覧画面</div>
+            <div class="manual-frame-stage short">
+              <iframe src="members.html" title="部員一覧画面"></iframe>
+            </div>
+          </div>
+          <div class="manual-frame-wrap">
+            <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 部員追加画面</div>
+            <div class="manual-frame-stage short">
+              <iframe src="member-add.html" title="部員追加画面"></iframe>
+            </div>
+          </div>
+        </div>
+        <div class="manual-section-stack">
+          <div class="manual-card">
+            <h3>できること</h3>
+            <ul>
+              <li>氏名検索</li>
+              <li>部員追加</li>
+              <li>部員編集</li>
+              <li>部員削除</li>
+            </ul>
+          </div>
+          <div class="manual-card manual-note">
+            <h3>注意</h3>
+            <p>部員名を変更しても、過去の申請データに保存された運転者名は自動更新されません。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="manual-sheet">
+      <div class="manual-page-header">
+        <h2 class="manual-page-title">11. 旅行一覧</h2>
+        <div class="manual-page-number">Page 11</div>
+      </div>
+      <div class="manual-grid equal">
+        <div class="manual-section-stack">
+          <div class="manual-frame-wrap">
+            <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 旅行一覧画面</div>
+            <div class="manual-frame-stage short">
+              <iframe src="trips.html" title="旅行一覧画面"></iframe>
+            </div>
+          </div>
+          <div class="manual-frame-wrap">
+            <div class="manual-frame-bar"><span class="manual-dot red"></span><span class="manual-dot yellow"></span><span class="manual-dot green"></span> 旅行追加画面</div>
+            <div class="manual-frame-stage short">
+              <iframe src="trip-add.html" title="旅行追加画面"></iframe>
+            </div>
+          </div>
+        </div>
+        <div class="manual-section-stack">
+          <div class="manual-card">
+            <h3>できること</h3>
+            <ul>
+              <li>旅行名検索</li>
+              <li>旅行追加</li>
+              <li>旅行編集</li>
+              <li>往路距離・復路距離・往復距離の管理</li>
+            </ul>
+          </div>
+          <div class="manual-card manual-note">
+            <h3>注意</h3>
+            <p>旅行名や経路情報を編集しても、過去の申請データに保存された旅行名・経路情報は自動更新されません。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
