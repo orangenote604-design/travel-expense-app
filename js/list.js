@@ -2,6 +2,7 @@ let allTravelRecords = [];
 let allMembers = [];
 let allTrips = [];
 let selectedControlNos = new Set();
+let currentReceiptBlobUrl = '';
 
 document.addEventListener('DOMContentLoaded', async () => {
   setLoading(true, '画面を読み込み中...');
@@ -193,8 +194,30 @@ function getSelectedRecords() {
 function clearReceiptResult() {
   const container = document.getElementById('receiptResult');
   if (!container) return;
+  if (currentReceiptBlobUrl) {
+    URL.revokeObjectURL(currentReceiptBlobUrl);
+    currentReceiptBlobUrl = '';
+  }
   container.className = 'receipt-result hidden';
   container.innerHTML = '';
+}
+
+function createBlobUrlFromBase64(base64, mimeType) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType || 'application/pdf' }));
+}
+
+function triggerPdfDownload(blobUrl, fileName) {
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = fileName || 'receipt.pdf';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 function renderReceiptResult(result) {
@@ -205,22 +228,21 @@ function renderReceiptResult(result) {
     ? `<div class="receipt-result-note">未取得の管理番号: ${escapeHtml(result.missingControlNos.join(', '))}</div>`
     : '';
 
-  const folderLink = result.folderUrl
-    ? `<a href="${escapeHtml(result.folderUrl)}" target="_blank" rel="noopener">保存先フォルダを開く</a>`
-    : '';
+  currentReceiptBlobUrl = createBlobUrlFromBase64(result.pdfBase64, result.mimeType);
 
   container.className = 'receipt-result';
   container.innerHTML = `
     <div class="receipt-result-title">受領証PDFを生成しました</div>
     <div class="receipt-result-meta">ファイル名: ${escapeHtml(result.fileName || '')}${result.createdAt ? ` / 生成日時: ${escapeHtml(result.createdAt)}` : ''}</div>
     <div class="receipt-result-links">
-      <a href="${escapeHtml(result.viewUrl || result.fileUrl || '#')}" target="_blank" rel="noopener">PDFを開く</a>
-      <a href="${escapeHtml(result.downloadUrl || result.viewUrl || '#')}" target="_blank" rel="noopener">PDFをダウンロード</a>
-      ${folderLink}
+      <a href="${escapeHtml(currentReceiptBlobUrl)}" target="_blank" rel="noopener">PDFを開く</a>
+      <a href="${escapeHtml(currentReceiptBlobUrl)}" download="${escapeHtml(result.fileName || 'receipt.pdf')}">PDFをダウンロード</a>
     </div>
-    <div class="receipt-result-note">PDFはGoogle Driveに保存されています。必要に応じて上のリンクから開いてください。</div>
+    <div class="receipt-result-note">PDFは一時生成です。画面を閉じるか再読み込みするとリンクは無効になります。</div>
     ${missing}
   `;
+
+  triggerPdfDownload(currentReceiptBlobUrl, result.fileName || 'receipt.pdf');
 }
 
 async function handleGenerateReceiptPdfClick() {
