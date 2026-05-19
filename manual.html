@@ -6,7 +6,7 @@
   <title>操作マニュアル | 旅費申請システム</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    @page { size: A4 landscape; margin: 12mm; }
+    @page { margin: 12mm; }
     body.manual-body {
       background: #eef2f7;
     }
@@ -14,14 +14,13 @@
       padding: 24px 0 40px;
     }
     .manual-sheet {
-      width: min(100%, 297mm);
-      min-height: 190mm;
+      width: min(100%, 1280px);
       margin: 0 auto 24px;
       background: #ffffff;
       border: 1px solid #d9e0ea;
       border-radius: 18px;
       box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
-      padding: 18mm 16mm 14mm;
+      padding: 32px 28px 24px;
       page-break-after: always;
       break-after: page;
     }
@@ -31,10 +30,9 @@
     }
     .manual-cover {
       display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
-      gap: 20px;
-      align-items: center;
-      min-height: 155mm;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 22px;
+      align-items: start;
     }
     .manual-kicker {
       display: inline-flex;
@@ -327,12 +325,61 @@
       color: #64748b;
       font-size: 11px;
     }
+    .manual-highlight-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .manual-highlight-card {
+      border: 1px solid #d9e0ea;
+      border-radius: 14px;
+      padding: 14px 16px;
+      background: #f8fafc;
+    }
+    .manual-highlight-card h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      color: #1d4ed8;
+    }
+    .manual-highlight-card p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.8;
+      color: #334155;
+    }
+    .manual-screen-guide {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .manual-screen-guide-card {
+      border: 1px solid #d9e0ea;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .manual-screen-guide-card h4 {
+      margin: 0;
+      padding: 12px 14px 6px;
+      font-size: 15px;
+    }
+    .manual-screen-guide-card p {
+      margin: 0;
+      padding: 0 14px 12px;
+      font-size: 12px;
+      line-height: 1.8;
+      color: #475569;
+    }
     @media (max-width: 1200px) {
       .manual-grid,
       .manual-grid.equal,
       .manual-cover,
       .manual-toc,
-      .manual-two-shots {
+      .manual-two-shots,
+      .manual-highlight-grid,
+      .manual-screen-guide {
         grid-template-columns: 1fr;
       }
       .manual-frame-stage,
@@ -381,11 +428,25 @@
         <div>
           <div class="manual-kicker">操作マニュアル / Version 1.0.2</div>
           <h1 class="manual-cover-title">宍粟市野球部<br>旅費申請システム<br>操作マニュアル</h1>
-          <p class="manual-cover-subtitle">実際のシステム画面をそのまま確認しながら、申請登録・一覧確認・受領証PDF出力・マスタ管理までの基本操作を順番に確認できるHTMLマニュアルです。</p>
+          <p class="manual-cover-subtitle">このマニュアルは、実際のシステム画面を見ながら操作を確認できるように作成しています。まずは「どの画面で何をするか」を把握し、そのあと必要な操作ページを順にご覧ください。</p>
           <div class="manual-meta-list">
             <div class="manual-meta-item"><div class="manual-meta-label">対象バージョン</div><div>1.0.2</div></div>
-            <div class="manual-meta-item"><div class="manual-meta-label">対象ユーザー</div><div>旅費申請を行う担当者 / 一覧管理を行う担当者 / 部員・旅行マスタを管理する担当者</div></div>
-            <div class="manual-meta-item"><div class="manual-meta-label">主な機能</div><div>申請入力、申請一覧、受領証PDF出力、支払い済み一括更新、部員一覧、旅行一覧</div></div>
+            <div class="manual-meta-item"><div class="manual-meta-label">対象ユーザー</div><div>旅費申請を登録する担当者 / 一覧確認・支払い処理を行う担当者 / 部員・旅行マスタを管理する担当者</div></div>
+            <div class="manual-meta-item"><div class="manual-meta-label">最初に見るページ</div><div>「2. システム概要」→「3. 画面共通の見方」→必要な操作ページの順で読むと全体をつかみやすくなります。</div></div>
+          </div>
+          <div class="manual-highlight-grid">
+            <div class="manual-highlight-card">
+              <h3>申請を登録したいとき</h3>
+              <p>「申請入力」を開き、旅費発生日・旅行名・運転者・費用を入力して登録します。</p>
+            </div>
+            <div class="manual-highlight-card">
+              <h3>内容を確認したいとき</h3>
+              <p>「申請一覧」を開き、検索・集計・編集・削除・受領証PDF出力を行います。</p>
+            </div>
+            <div class="manual-highlight-card">
+              <h3>候補を増やしたいとき</h3>
+              <p>「部員一覧」「旅行一覧」でマスタを追加し、申請入力で選べるようにします。</p>
+            </div>
           </div>
         </div>
         <div class="manual-preview-card">
@@ -423,43 +484,64 @@
         <h2 class="manual-page-title">2. システム概要</h2>
         <div class="manual-page-number">Page 2</div>
       </div>
-      <div class="manual-grid equal">
-        <div class="manual-card">
-          <h3>このシステムでできること</h3>
-          <ul>
-            <li>旅費申請の新規登録・編集・削除</li>
-            <li>旅行マスタからの経路・距離の自動反映</li>
-            <li>支給額の自動計算</li>
-            <li>申請一覧からの検索・集計・一括操作</li>
-            <li>受領証PDFの出力</li>
-            <li>部員一覧・旅行一覧のマスタ管理</li>
-          </ul>
-          <div class="manual-inline-list">
-            <span class="manual-tag">申請入力</span>
-            <span class="manual-tag">申請一覧</span>
-            <span class="manual-tag">部員一覧</span>
-            <span class="manual-tag">旅行一覧</span>
-            <span class="manual-tag">受領証PDF</span>
-          </div>
+      <div class="manual-card manual-success" style="margin-bottom:16px;">
+        <h3>まず覚えること</h3>
+        <p>このシステムは、<strong>申請する画面</strong>、<strong>申請を確認・まとめて処理する画面</strong>、<strong>候補データを管理する画面</strong>の3つに分けて使うとわかりやすくなります。</p>
+      </div>
+      <div class="manual-highlight-grid">
+        <div class="manual-highlight-card">
+          <h3>1. 申請する</h3>
+          <p><strong>申請入力</strong>で旅費申請を登録します。旅行名を選ぶと、旅行情報や距離が自動で反映されます。</p>
         </div>
-        <div class="manual-card manual-success">
-          <h3>基本的な利用の流れ</h3>
-          <table class="manual-step-table">
-            <tr><th>手順1</th><td>部員一覧・旅行一覧に必要なマスタを登録します。</td></tr>
-            <tr><th>手順2</th><td>申請入力で旅費申請を登録します。</td></tr>
-            <tr><th>手順3</th><td>申請一覧で検索・確認・編集・削除を行います。</td></tr>
-            <tr><th>手順4</th><td>必要に応じて複数選択し、受領証PDFを出力します。</td></tr>
-            <tr><th>手順5</th><td>支払い後、申請一覧から支払い済みフラグをまとめて更新します。</td></tr>
-          </table>
+        <div class="manual-highlight-card">
+          <h3>2. 確認・出力する</h3>
+          <p><strong>申請一覧</strong>で検索・集計・編集・削除を行い、必要に応じて受領証PDFを出力します。</p>
+        </div>
+        <div class="manual-highlight-card">
+          <h3>3. 候補を管理する</h3>
+          <p><strong>部員一覧</strong>と<strong>旅行一覧</strong>で、申請入力時に選ぶ候補データを整備します。</p>
         </div>
       </div>
-      <div class="manual-card" style="margin-top:16px;">
-        <h3>主要画面</h3>
-        <div class="manual-two-shots">
-          <div class="manual-mini-shot"><iframe src="index.html" title="申請入力画面"></iframe><div class="manual-shot-caption">申請入力：旅費申請を登録する画面</div></div>
-          <div class="manual-mini-shot"><iframe src="list.html" title="申請一覧画面"></iframe><div class="manual-shot-caption">申請一覧：検索・集計・一括操作を行う画面</div></div>
-          <div class="manual-mini-shot"><iframe src="members.html" title="部員一覧画面"></iframe><div class="manual-shot-caption">部員一覧：運転者候補を管理する画面</div></div>
-          <div class="manual-mini-shot"><iframe src="trips.html" title="旅行一覧画面"></iframe><div class="manual-shot-caption">旅行一覧：旅行マスタを管理する画面</div></div>
+      <div class="manual-screen-guide">
+        <div class="manual-screen-guide-card">
+          <div class="manual-mini-shot"><iframe src="index.html" title="申請入力画面"></iframe></div>
+          <h4>申請入力</h4>
+          <p>新しい旅費申請を登録する画面です。旅費発生日・旅行名・運転者・費用を入力します。</p>
+        </div>
+        <div class="manual-screen-guide-card">
+          <div class="manual-mini-shot"><iframe src="list.html" title="申請一覧画面"></iframe></div>
+          <h4>申請一覧</h4>
+          <p>登録済みの申請を検索・確認する画面です。受領証PDF出力や支払い済み一括更新もここで行います。</p>
+        </div>
+        <div class="manual-screen-guide-card">
+          <div class="manual-mini-shot"><iframe src="members.html" title="部員一覧画面"></iframe></div>
+          <h4>部員一覧</h4>
+          <p>運転者として選択できる部員名を登録・編集する画面です。</p>
+        </div>
+        <div class="manual-screen-guide-card">
+          <div class="manual-mini-shot"><iframe src="trips.html" title="旅行一覧画面"></iframe></div>
+          <h4>旅行一覧</h4>
+          <p>旅行名、経路、距離など、申請入力に反映される旅行マスタを管理する画面です。</p>
+        </div>
+      </div>
+      <div class="manual-grid equal" style="margin-top:16px;">
+        <div class="manual-card">
+          <h3>基本的な利用の流れ</h3>
+          <table class="manual-step-table">
+            <tr><th>手順1</th><td>最初に部員一覧・旅行一覧を確認し、必要な候補がそろっているか確認します。</td></tr>
+            <tr><th>手順2</th><td>申請入力で旅費申請を登録します。</td></tr>
+            <tr><th>手順3</th><td>申請一覧で登録内容を確認し、必要に応じて編集・削除します。</td></tr>
+            <tr><th>手順4</th><td>受領証が必要な場合は、申請一覧から対象を選んでPDF出力します。</td></tr>
+            <tr><th>手順5</th><td>支払い後、申請一覧から支払い済みフラグを更新します。</td></tr>
+          </table>
+        </div>
+        <div class="manual-card manual-note">
+          <h3>補足</h3>
+          <ul>
+            <li>旅行名や部員名は、マスタに登録されている内容から選択します。</li>
+            <li>旅行マスタを編集しても、過去の申請データは自動更新されません。</li>
+            <li>部員名を編集しても、過去の申請データに保存済みの運転者名は自動更新されません。</li>
+          </ul>
         </div>
       </div>
     </section>
@@ -786,5 +868,6 @@
       </div>
     </section>
   </main>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
