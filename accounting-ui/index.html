@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>宍粟市野球部 会計システム</title>
+  <link rel="stylesheet" href="./css/accounting.css" />
+</head>
+<body>
+  <div id="loadingOverlay" class="loading-overlay hidden">
+    <div class="loading-panel">
+      <div class="loading-spinner"></div>
+      <div id="loadingText">読み込み中...</div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <section id="userSelectScreen" class="startup-screen">
+    <div class="startup-card">
+      <div class="startup-badge">Accounting</div>
+      <h1>会計システム</h1>
+      <p class="startup-lead">最初に利用者を選択してください。選択した氏名は、会計伝票の登録者・更新者として自動記録されます。</p>
+
+      <div class="user-select-toolbar">
+        <label class="field">
+          <span>利用者検索</span>
+          <input type="text" id="userSearchInput" placeholder="氏名で絞り込み" />
+        </label>
+        <button id="reloadUsersButton" class="button secondary" type="button">再読み込み</button>
+      </div>
+
+      <div id="userListStatus" class="inline-note">部員一覧を読み込みます</div>
+      <div id="userList" class="user-list"></div>
+    </div>
+  </section>
+
+  <div id="appShell" class="app-shell hidden">
+    <header class="site-header">
+      <div class="container site-header-inner">
+        <div>
+          <div class="site-title">宍粟市野球部 会計システム</div>
+          <div class="site-subtitle">旅費申請システムとは別UI / 共通DB運用</div>
+        </div>
+
+        <div class="header-actions">
+          <div class="current-user-box">
+            <span class="label">現在ユーザー</span>
+            <strong id="currentUserName">未選択</strong>
+          </div>
+          <button id="switchUserButton" class="button secondary" type="button">利用者切替</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="container layout">
+      <aside class="sidebar card">
+        <div class="sidebar-title">メニュー</div>
+        <nav class="side-nav">
+          <button class="side-nav-button active" data-page="home" type="button">ホーム</button>
+          <button class="side-nav-button" data-page="expenses" type="button">支出伝票一覧</button>
+          <button class="side-nav-button disabled" type="button" disabled>支出伝票登録（次工程）</button>
+          <button class="side-nav-button disabled" type="button" disabled>収入伝票一覧（次工程）</button>
+          <button class="side-nav-button disabled" type="button" disabled>部員一覧（次工程）</button>
+          <button class="side-nav-button disabled" type="button" disabled>科目一覧（次工程）</button>
+        </nav>
+      </aside>
+
+      <main class="content-area">
+        <section id="page-home" class="page-section active">
+          <div class="page-head">
+            <div>
+              <h2 class="page-title">ホーム</h2>
+              <p class="page-description">対象年度の件数・金額サマリーと、支出伝票一覧への導線を表示します。</p>
+            </div>
+            <div class="page-actions">
+              <label class="field compact-field">
+                <span>対象年度</span>
+                <select id="homeFiscalYear"></select>
+              </label>
+              <button id="refreshHomeButton" class="button primary" type="button">更新</button>
+            </div>
+          </div>
+
+          <div class="summary-grid">
+            <article class="summary-card">
+              <div class="summary-label">支出伝票件数</div>
+              <div id="homeExpenseCount" class="summary-value">0</div>
+            </article>
+            <article class="summary-card">
+              <div class="summary-label">支出合計</div>
+              <div id="homeExpenseTotal" class="summary-value">0 円</div>
+            </article>
+            <article class="summary-card">
+              <div class="summary-label">未払件数</div>
+              <div id="homeUnpaidCount" class="summary-value">0</div>
+            </article>
+            <article class="summary-card">
+              <div class="summary-label">証憑あり件数</div>
+              <div id="homeEvidenceCount" class="summary-value">0</div>
+            </article>
+          </div>
+
+          <div class="card quick-card">
+            <div class="card-title">クイックアクション</div>
+            <div class="button-row">
+              <button id="goExpensesButton" class="button primary" type="button">支出伝票一覧へ</button>
+              <button id="openSwitchUserFromHome" class="button secondary" type="button">利用者を切り替える</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="page-expenses" class="page-section">
+          <div class="page-head">
+            <div>
+              <h2 class="page-title">支出伝票一覧</h2>
+              <p class="page-description">支出伝票の検索・確認用画面です。右側に選択伝票の詳細と証憑情報を表示します。</p>
+            </div>
+            <div class="page-actions wrap-actions">
+              <label class="field compact-field">
+                <span>年度</span>
+                <select id="expenseFiscalYear"></select>
+              </label>
+              <label class="field compact-field grow-field">
+                <span>キーワード</span>
+                <input type="text" id="expenseKeyword" placeholder="伝票番号 / 科目 / 摘要 / 支払先" />
+              </label>
+              <label class="field compact-field">
+                <span>支払状況</span>
+                <select id="expenseStatus">
+                  <option value="">すべて</option>
+                  <option value="未払">未払</option>
+                  <option value="支払済">支払済</option>
+                </select>
+              </label>
+              <button id="searchExpensesButton" class="button primary" type="button">検索</button>
+            </div>
+          </div>
+
+          <div class="content-grid">
+            <div class="card table-card">
+              <div class="card-title-row">
+                <div class="card-title">支出伝票一覧</div>
+                <div id="expenseCountLabel" class="inline-note">0件</div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>伝票番号</th>
+                      <th>年度</th>
+                      <th>科目名</th>
+                      <th>支出日</th>
+                      <th class="text-right">支出金額</th>
+                      <th>摘要</th>
+                      <th>支払先</th>
+                      <th>支払状況</th>
+                      <th>証憑</th>
+                    </tr>
+                  </thead>
+                  <tbody id="expenseTableBody">
+                    <tr>
+                      <td colspan="9" class="empty-cell">データを読み込んでください</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <aside class="card detail-card">
+              <div class="card-title">伝票詳細</div>
+              <div id="expenseDetailEmpty" class="empty-detail">一覧から伝票を選択してください。</div>
+
+              <div id="expenseDetailBody" class="detail-body hidden">
+                <div class="detail-grid">
+                  <div class="detail-item"><span>伝票番号</span><strong id="detailVoucherNo">-</strong></div>
+                  <div class="detail-item"><span>年度</span><strong id="detailFiscalYear">-</strong></div>
+                  <div class="detail-item"><span>科目コード</span><strong id="detailSubjectCode">-</strong></div>
+                  <div class="detail-item"><span>科目名</span><strong id="detailSubjectName">-</strong></div>
+                  <div class="detail-item"><span>支出日</span><strong id="detailExpenseDate">-</strong></div>
+                  <div class="detail-item"><span>支払状況</span><strong id="detailPaymentStatus">-</strong></div>
+                  <div class="detail-item span-2"><span>摘要</span><strong id="detailSummary">-</strong></div>
+                  <div class="detail-item span-2"><span>支払先</span><strong id="detailPayee">-</strong></div>
+                  <div class="detail-item"><span>支出金額</span><strong id="detailAmount">-</strong></div>
+                  <div class="detail-item"><span>関連旅費管理番号</span><strong id="detailTravelControlNo">-</strong></div>
+                  <div class="detail-item span-2"><span>備考</span><strong id="detailNote">-</strong></div>
+                  <div class="detail-item"><span>登録者</span><strong id="detailCreatedBy">-</strong></div>
+                  <div class="detail-item"><span>更新者</span><strong id="detailUpdatedBy">-</strong></div>
+                  <div class="detail-item"><span>登録日時</span><strong id="detailCreatedAt">-</strong></div>
+                  <div class="detail-item"><span>更新日時</span><strong id="detailUpdatedAt">-</strong></div>
+                </div>
+
+                <div class="evidence-box">
+                  <div class="evidence-head">
+                    <div>
+                      <div class="evidence-title">証憑プレビュー</div>
+                      <div id="evidenceMeta" class="inline-note">証憑なし</div>
+                    </div>
+                    <a id="evidenceOpenLink" class="text-link hidden" target="_blank" rel="noopener noreferrer">別タブで開く</a>
+                  </div>
+                  <div id="evidencePreview" class="evidence-preview empty-preview">証憑が登録されていません。</div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="switchUserModal" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal="switchUserModal"></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>利用者切替</h3>
+        <button class="icon-button" type="button" data-close-modal="switchUserModal">×</button>
+      </div>
+      <div class="modal-body">
+        <label class="field">
+          <span>利用者検索</span>
+          <input type="text" id="switchUserSearchInput" placeholder="氏名で絞り込み" />
+        </label>
+        <div id="switchUserList" class="user-list compact"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/accounting.js"></script>
+</body>
+</html>
