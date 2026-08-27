@@ -1,1 +1,1 @@
-const API_BASE_URL = 'REPLACE_WITH_YOUR_GAS_WEBAPP_URL';
+const API_BASE_URL = 'https://script.google.com/macros/s/AKfycby8rfaEJs8_dKWr1TvbjysWTaFsWSQyFb3k_RkO8EFQ-swxHjtu_JG9yFSSYqZRgIRG/exec';
