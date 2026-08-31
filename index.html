@@ -3,95 +3,813 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>旅費申請入力</title>
-  <link rel="stylesheet" href="css/style.css" />
+  <title>宍粟市野球部 会計システム</title>
+  <link rel="stylesheet" href="./css/accounting.css" />
 </head>
 <body>
-  <div id="loadingOverlay" class="loading-overlay show">
+  <div id="loadingOverlay" class="loading-overlay hidden">
     <div class="loading-panel">
       <div class="loading-spinner"></div>
-      <div id="loadingOverlayText">画面を読み込み中...</div>
+      <div id="loadingText">読み込み中...</div>
     </div>
   </div>
-  <header class="site-header">
-    <div class="container site-header-inner">
-      <div class="site-title">旅費申請システム</div>
-      <nav class="nav">
-        <a href="index.html" class="active">申請入力</a>
-        <a href="list.html">申請一覧</a>
-        <a href="members.html">部員一覧</a>
-        <a href="trips.html">旅行一覧</a>
-      </nav><a href="manual.html" class="button-link manual-beta-button"><span class="manual-beta-label">操作マニュアル</span><span class="manual-beta-badge">β版</span></a>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <section id="userSelectScreen" class="startup-screen">
+    <div class="startup-card">
+      <div class="startup-badge">Accounting</div>
+      <h1>会計システム</h1>
+      <p class="startup-lead">最初に利用者を選択してください。選択した氏名は、会計伝票の登録者・更新者として自動記録されます。</p>
+
+      <div class="user-select-toolbar">
+        <label class="field grow-field">
+          <span>利用者検索</span>
+          <input type="text" id="userSearchInput" placeholder="氏名で絞り込み" />
+        </label>
+        <button id="reloadUsersButton" class="button secondary" type="button">再読み込み</button>
+      </div>
+
+      <div id="userListStatus" class="inline-note">部員一覧を読み込みます</div>
+      <div id="userList" class="user-list"></div>
     </div>
-  </header>
+  </section>
 
-  <main class="page">
-    <div class="container">
-      <h1 class="page-title" id="pageTitle">旅費申請入力</h1>
-      <div id="message" class="message"></div>
-
-      <form id="travelForm">
-        <section class="card">
-          <h2 class="card-title">基本情報</h2>
-          <div class="grid grid-2">
-            <div class="field"><label for="travelDate">旅費発生日</label><input type="date" id="travelDate" required /></div>
-            <div class="field"><label for="fiscalYear">年度</label><input type="text" id="fiscalYear" readonly /></div>
-            <div class="field"><label for="controlNo">管理番号</label><input type="text" id="controlNo" readonly /></div>
-            <div class="field"><label for="tripName">旅行名</label><select id="tripName" required><option value="">選択してください</option></select></div>
-            <div class="field"><label for="driverName">運転者</label><select id="driverName" required><option value="">選択してください</option></select></div>
-          </div>
-        </section>
-
-        <section class="card">
-          <h2 class="card-title">旅行情報（旅行マスタから自動入力）</h2>
-          <div class="grid grid-2">
-            <div class="field"><label for="departureFrom">出発地</label><input type="text" id="departureFrom" readonly /></div>
-            <div class="field"><label for="arrivalTo">到着地</label><input type="text" id="arrivalTo" readonly /></div>
-            <div class="field"><label for="returnFrom">帰路出発地</label><input type="text" id="returnFrom" readonly /></div>
-            <div class="field"><label for="returnTo">帰路到着地</label><input type="text" id="returnTo" readonly /></div>
-            <div class="field field-span-2"><label for="routeNote">経由地等補足</label><textarea id="routeNote" readonly></textarea></div>
-            <div class="field"><label for="outboundDistance">往路距離</label><input type="number" id="outboundDistance" step="0.1" min="0" readonly /></div>
-            <div class="field inline-check"><input type="checkbox" id="separateReturn" disabled /><label for="separateReturn">復路距離を個別入力する</label></div>
-            <div class="field hidden" id="returnDistanceField"><label for="returnDistance">復路距離</label><input type="number" id="returnDistance" step="0.1" min="0" readonly /></div>
-            <div class="field"><label for="roundTripDistance">往復距離</label><input type="number" id="roundTripDistance" class="amount-box" readonly /></div>
-          </div>
-        </section>
-
-        <section class="card">
-          <h2 class="card-title">費用情報</h2>
-          <div class="grid grid-2">
-            <div class="field"><label for="driverAllowance">運転手当</label><input type="number" id="driverAllowance" readonly /></div>
-            <div class="field"><label for="gasolineFee">ガソリン代</label><input type="number" id="gasolineFee" readonly /></div>
-            <div class="field"><label for="parkingFee">駐車場利用料</label><input type="number" id="parkingFee" min="0" step="1" value="0" /></div>
-            <div class="field"><label for="tollFee">高速道路利用料</label><input type="number" id="tollFee" min="0" step="1" value="0" /></div>
-            <div class="field"><label for="otherFee">その他</label><input type="number" id="otherFee" min="0" step="1" value="0" /></div>
-            <div class="field hidden" id="otherDetailField"><label for="otherDetail">その他内容</label><input type="text" id="otherDetail" /></div>
-            <div class="field"><label for="paymentAmount">支給額</label><input type="number" id="paymentAmount" class="amount-box" readonly /></div>
-          </div>
-          <p class="note hidden" id="manualFeeNote">往復距離の四捨五入値が301km以上の場合、運転手当とガソリン代は手入力です。</p>
-        </section>
-
-        <section class="card">
-          <h2 class="card-title">補足</h2>
-          <div class="grid grid-2">
-            <div class="field inline-check"><input type="checkbox" id="paidFlag" /><label for="paidFlag">支払い済み</label></div>
-            <div></div>
-            <div class="field field-span-2"><label for="remarks">備考</label><textarea id="remarks"></textarea></div>
-          </div>
-        </section>
-
-        <div class="button-row">
-          <button type="submit" class="primary" id="submitButton">登録する</button>
-          <button type="button" class="secondary" id="clearButton">入力内容をクリア</button>
-          <a href="list.html" class="button-link secondary">申請一覧へ</a>
+  <div id="appShell" class="app-shell hidden">
+    <header class="site-header">
+      <div class="container site-header-inner">
+        <div>
+          <div class="site-title">宍粟市野球部 会計システム</div>
+          <div class="site-subtitle">旅費申請システムとは別UI / 共通DB運用</div>
         </div>
-      </form>
-    </div>
-  </main>
 
-  <script src="js/config.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/common.js"></script>
-  <script src="js/index.js"></script>
+        <div class="header-actions">
+          <div class="current-user-box">
+            <span class="label">現在ユーザー</span>
+            <strong id="currentUserName">未選択</strong>
+          </div>
+          <button id="switchUserButton" class="button secondary" type="button">利用者切替</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="container layout">
+      <aside class="sidebar card">
+        <div class="sidebar-title">メニュー</div>
+        <nav class="side-nav">
+          <button class="side-nav-button active" data-page="home" type="button">ホーム</button>
+          <button class="side-nav-button" data-page="expenses" type="button">支出伝票一覧</button>
+          <button class="side-nav-button" data-page="expense-form" type="button">支出伝票登録</button>
+          <button class="side-nav-button" data-page="incomes" type="button">収入伝票一覧</button>
+          <button class="side-nav-button" data-page="income-form" type="button">収入伝票登録</button>
+          <button class="side-nav-button" data-page="members" type="button">部員一覧</button>
+          <button class="side-nav-button" data-page="subjects" type="button">科目一覧</button>
+          <button class="side-nav-button" data-page="budget" type="button">予算書</button>
+        </nav>
+      </aside>
+
+      <main class="content-area">
+        <section id="page-home" class="page-section active">
+          <div class="page-head">
+            <div>
+              <h2 class="page-title">ホーム</h2>
+              <p class="page-description">対象年度の支出・収入サマリーと、各伝票の登録・一覧確認への導線を表示します。</p>
+            </div>
+            <div class="page-actions">
+              <label class="field compact-field">
+                <span>対象年度</span>
+                <select id="homeFiscalYear"></select>
+              </label>
+              <button id="refreshHomeButton" class="button primary" type="button">更新</button>
+            </div>
+          </div>
+
+          <div class="summary-grid">
+            <article class="summary-card">
+              <div class="summary-label">支出合計</div>
+              <div id="homeExpenseTotal" class="summary-value">0 円</div>
+            </article>
+            <article class="summary-card income">
+              <div class="summary-label">収入合計</div>
+              <div id="homeIncomeTotal" class="summary-value">0 円</div>
+            </article>
+            <article class="summary-card balance">
+              <div class="summary-label">収支差額（収入合計 - 支出合計）</div>
+              <div id="homeBalanceTotal" class="summary-value">0 円</div>
+            </article>
+          </div>
+
+          <div class="card quick-card">
+            <div class="card-title">クイックアクション</div>
+            <div class="button-row wrap-actions">
+              <button id="goExpensesButton" class="button primary" type="button">支出伝票一覧へ</button>
+              <button id="goExpenseCreateButton" class="button success" type="button">支出伝票を新規登録</button>
+              <button id="goIncomesButton" class="button primary income-action" type="button">収入伝票一覧へ</button>
+              <button id="goIncomeCreateButton" class="button success income-action" type="button">収入伝票を新規登録</button>
+              <button id="openTravelTransferFromHome" class="button secondary" type="button">旅費申請から転記</button>
+              <button id="openSwitchUserFromHome" class="button secondary" type="button">利用者を切り替える</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="page-expenses" class="page-section">
+          <div class="page-head">
+            <div>
+              <h2 class="page-title">支出伝票一覧</h2>
+              <p class="page-description">支出伝票の検索・確認画面です。選択した伝票は右側で詳細確認し、そのまま編集・削除できます。</p>
+            </div>
+            <div class="page-actions wrap-actions">
+              <label class="field compact-field">
+                <span>年度</span>
+                <select id="expenseFiscalYear"></select>
+              </label>
+              <label class="field compact-field grow-field">
+                <span>キーワード</span>
+                <input type="text" id="expenseKeyword" placeholder="伝票番号 / 科目 / 摘要 / 支払先" />
+              </label>
+              <button id="searchExpensesButton" class="button primary" type="button">検索</button>
+              <button id="openExpenseCreateButton" class="button success" type="button">新規登録</button>
+              <button id="openTravelTransferButton" class="button secondary" type="button">旅費申請から転記</button>
+            </div>
+          </div>
+
+          <div class="content-grid">
+            <div class="card table-card">
+              <div class="card-title-row">
+                <div class="card-title">支出伝票一覧</div>
+                <div id="expenseCountLabel" class="inline-note">0件</div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>伝票番号</th>
+                      <th>年度</th>
+                      <th>科目名</th>
+                      <th>支出日</th>
+                      <th class="text-right">支出金額</th>
+                      <th>摘要</th>
+                      <th>支払先</th>
+                      <th>証憑</th>
+                    </tr>
+                  </thead>
+                  <tbody id="expenseTableBody">
+                    <tr>
+                      <td colspan="8" class="empty-cell">データを読み込んでください</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <aside class="card detail-card">
+              <div class="card-title-row">
+                <div class="card-title">伝票詳細</div>
+                <div class="button-row tight-row">
+                  <button id="editExpenseButton" class="button secondary small" type="button" disabled>編集</button>
+                  <button id="deleteExpenseButton" class="button danger small" type="button" disabled>削除</button>
+                </div>
+              </div>
+              <div id="expenseDetailEmpty" class="empty-detail">一覧から伝票を選択してください。</div>
+
+              <div id="expenseDetailBody" class="detail-body hidden">
+                <div class="detail-grid">
+                  <div class="detail-item"><span>伝票番号</span><strong id="detailVoucherNo">-</strong></div>
+                  <div class="detail-item"><span>年度</span><strong id="detailFiscalYear">-</strong></div>
+                  <div class="detail-item"><span>科目コード</span><strong id="detailSubjectCode">-</strong></div>
+                  <div class="detail-item"><span>科目名</span><strong id="detailSubjectName">-</strong></div>
+                  <div class="detail-item"><span>支出日</span><strong id="detailExpenseDate">-</strong></div>
+                  <div class="detail-item span-2"><span>摘要</span><strong id="detailSummary">-</strong></div>
+                  <div class="detail-item span-2"><span>支払先</span><strong id="detailPayee">-</strong></div>
+                  <div class="detail-item"><span>支出金額</span><strong id="detailAmount">-</strong></div>
+                  <div class="detail-item"><span>関連旅費管理番号</span><strong id="detailTravelControlNo">-</strong></div>
+                  <div class="detail-item span-2"><span>備考</span><strong id="detailNote">-</strong></div>
+                  <div class="detail-item"><span>登録者</span><strong id="detailCreatedBy">-</strong></div>
+                  <div class="detail-item"><span>更新者</span><strong id="detailUpdatedBy">-</strong></div>
+                  <div class="detail-item"><span>登録日時</span><strong id="detailCreatedAt">-</strong></div>
+                  <div class="detail-item"><span>更新日時</span><strong id="detailUpdatedAt">-</strong></div>
+                </div>
+
+                <div class="evidence-box">
+                  <div class="evidence-head">
+                    <div>
+                      <div class="evidence-title">証憑プレビュー</div>
+                      <div id="evidenceMeta" class="inline-note">証憑なし</div>
+                    </div>
+                    <a id="evidenceOpenLink" class="text-link hidden" target="_blank" rel="noopener noreferrer">別タブで開く</a>
+                  </div>
+                  <div id="evidencePreview" class="evidence-preview empty-preview">証憑が登録されていません。</div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+
+        <section id="page-incomes" class="page-section">
+          <div class="page-head">
+            <div>
+              <h2 class="page-title">収入伝票一覧</h2>
+              <p class="page-description">収入伝票の検索・確認画面です。選択した伝票は右側で詳細確認し、そのまま編集・削除できます。</p>
+            </div>
+            <div class="page-actions wrap-actions">
+              <label class="field compact-field">
+                <span>年度</span>
+                <select id="incomeFiscalYear"></select>
+              </label>
+              <label class="field compact-field grow-field">
+                <span>キーワード</span>
+                <input type="text" id="incomeKeyword" placeholder="伝票番号 / 科目 / 摘要 / 入金元" />
+              </label>
+              <button id="searchIncomesButton" class="button primary" type="button">検索</button>
+              <button id="openIncomeCreateButton" class="button success" type="button">新規登録</button>
+            </div>
+          </div>
+
+          <div class="content-grid">
+            <div class="card table-card">
+              <div class="card-title-row">
+                <div class="card-title">収入伝票一覧</div>
+                <div id="incomeCountLabel" class="inline-note">0件</div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>伝票番号</th>
+                      <th>年度</th>
+                      <th>科目名</th>
+                      <th>収入日</th>
+                      <th class="text-right">収入金額</th>
+                      <th>摘要</th>
+                      <th>入金元</th>
+                      <th>証憑</th>
+                    </tr>
+                  </thead>
+                  <tbody id="incomeTableBody">
+                    <tr>
+                      <td colspan="8" class="empty-cell">データを読み込んでください</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <aside class="card detail-card">
+              <div class="card-title-row">
+                <div class="card-title">伝票詳細</div>
+                <div class="button-row tight-row">
+                  <button id="editIncomeButton" class="button secondary small" type="button" disabled>編集</button>
+                  <button id="deleteIncomeButton" class="button danger small" type="button" disabled>削除</button>
+                </div>
+              </div>
+              <div id="incomeDetailEmpty" class="empty-detail">一覧から伝票を選択してください。</div>
+
+              <div id="incomeDetailBody" class="detail-body hidden">
+                <div class="detail-grid">
+                  <div class="detail-item"><span>伝票番号</span><strong id="incomeDetailVoucherNo">-</strong></div>
+                  <div class="detail-item"><span>年度</span><strong id="incomeDetailFiscalYear">-</strong></div>
+                  <div class="detail-item"><span>科目コード</span><strong id="incomeDetailSubjectCode">-</strong></div>
+                  <div class="detail-item"><span>科目名</span><strong id="incomeDetailSubjectName">-</strong></div>
+                  <div class="detail-item"><span>収入日</span><strong id="incomeDetailDate">-</strong></div>
+                  <div class="detail-item span-2"><span>摘要</span><strong id="incomeDetailSummary">-</strong></div>
+                  <div class="detail-item span-2"><span>入金元</span><strong id="incomeDetailPayer">-</strong></div>
+                  <div class="detail-item"><span>収入金額</span><strong id="incomeDetailAmount">-</strong></div>
+                  <div class="detail-item span-2"><span>備考</span><strong id="incomeDetailNote">-</strong></div>
+                  <div class="detail-item"><span>登録者</span><strong id="incomeDetailCreatedBy">-</strong></div>
+                  <div class="detail-item"><span>更新者</span><strong id="incomeDetailUpdatedBy">-</strong></div>
+                  <div class="detail-item"><span>登録日時</span><strong id="incomeDetailCreatedAt">-</strong></div>
+                  <div class="detail-item"><span>更新日時</span><strong id="incomeDetailUpdatedAt">-</strong></div>
+                </div>
+
+                <div class="evidence-box">
+                  <div class="evidence-head">
+                    <div>
+                      <div class="evidence-title">証憑プレビュー</div>
+                      <div id="incomeEvidenceMeta" class="inline-note">証憑なし</div>
+                    </div>
+                    <a id="incomeEvidenceOpenLink" class="text-link hidden" target="_blank" rel="noopener noreferrer">別タブで開く</a>
+                  </div>
+                  <div id="incomeEvidencePreview" class="evidence-preview empty-preview">証憑が登録されていません。</div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+
+        <section id="page-members" class="page-section">
+          <div class="page-head">
+            <div>
+              <h2 class="page-title">部員一覧</h2>
+              <p class="page-description">会計システムで利用する部員マスタを確認・追加・編集・削除できます。ここで変更した内容は利用者選択にも反映されます。</p>
+            </div>
+            <div class="page-actions wrap-actions">
+              <label class="field compact-field grow-field">
+                <span>氏名検索</span>
+                <input type="text" id="memberKeyword" placeholder="氏名で絞り込み" />
+              </label>
+              <button id="searchMembersButton" class="button primary" type="button">検索</button>
+              <button id="reloadMembersButton" class="button secondary" type="button">再読み込み</button>
+              <button id="openMemberCreateButton" class="button success" type="button">新規登録</button>
+            </div>
+          </div>
+
+          <div class="content-grid narrow-detail-grid">
+            <div class="card table-card">
+              <div class="card-title-row">
+                <div class="card-title">部員一覧</div>
+                <div id="memberCountLabel" class="inline-note">0件</div>
+              </div>
+              <div class="table-wrap simple-table-wrap">
+                <table class="simple-table">
+                  <thead>
+                    <tr>
+                      <th>氏名</th>
+                    </tr>
+                  </thead>
+                  <tbody id="memberTableBody">
+                    <tr>
+                      <td class="empty-cell">データを読み込んでください</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <aside class="card detail-card">
+              <div class="card-title-row">
+                <div class="card-title">部員詳細</div>
+                <div class="button-row tight-row">
+                  <button id="editMemberButton" class="button secondary small" type="button" disabled>編集</button>
+                  <button id="deleteMemberButton" class="button danger small" type="button" disabled>削除</button>
+                </div>
+              </div>
+              <div id="memberDetailEmpty" class="empty-detail">一覧から部員を選択してください。</div>
+              <div id="memberDetailBody" class="detail-body hidden">
+                <div class="detail-grid one-column-grid">
+                  <div class="detail-item">
+                    <span>氏名</span>
+                    <strong id="memberDetailName">-</strong>
+                  </div>
+                  <div class="detail-item">
+                    <span>利用メモ</span>
+                    <strong>利用者選択・登録者名・更新者名に使用されます</strong>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="page-subjects" class="page-section">
+          <div class="page-head">
+            <div>
+              <h2 class="page-title">科目一覧</h2>
+              <p class="page-description">支出・収入の科目マスタを確認・追加・編集・削除できます。無効科目も一覧表示します。</p>
+            </div>
+            <div class="page-actions wrap-actions">
+              <label class="field compact-field">
+                <span>収支区分</span>
+                <select id="subjectTypeFilter">
+                  <option value="">すべて</option>
+                  <option value="支出">支出</option>
+                  <option value="収入">収入</option>
+                </select>
+              </label>
+              <label class="field compact-field grow-field">
+                <span>キーワード</span>
+                <input type="text" id="subjectKeyword" placeholder="科目コード / 科目名 / 備考" />
+              </label>
+              <button id="searchSubjectsButton" class="button primary" type="button">検索</button>
+              <button id="reloadSubjectsButton" class="button secondary" type="button">再読み込み</button>
+              <button id="openSubjectCreateButton" class="button success" type="button">新規登録</button>
+            </div>
+          </div>
+
+          <div class="content-grid">
+            <div class="card table-card">
+              <div class="card-title-row">
+                <div class="card-title">科目一覧</div>
+                <div id="subjectCountLabel" class="inline-note">0件</div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>科目コード</th>
+                      <th>科目名</th>
+                      <th>収支区分</th>
+                      <th class="text-right">表示順</th>
+                      <th>使用可否</th>
+                      <th>備考</th>
+                    </tr>
+                  </thead>
+                  <tbody id="subjectTableBody">
+                    <tr>
+                      <td colspan="6" class="empty-cell">データを読み込んでください</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <aside class="card detail-card">
+              <div class="card-title-row">
+                <div class="card-title">科目詳細</div>
+                <div class="button-row tight-row">
+                  <button id="editSubjectButton" class="button secondary small" type="button" disabled>編集</button>
+                  <button id="deleteSubjectButton" class="button danger small" type="button" disabled>削除</button>
+                </div>
+              </div>
+              <div id="subjectDetailEmpty" class="empty-detail">一覧から科目を選択してください。</div>
+              <div id="subjectDetailBody" class="detail-body hidden">
+                <div class="detail-grid">
+                  <div class="detail-item"><span>科目コード</span><strong id="subjectDetailCode">-</strong></div>
+                  <div class="detail-item"><span>科目名</span><strong id="subjectDetailName">-</strong></div>
+                  <div class="detail-item"><span>収支区分</span><strong id="subjectDetailType">-</strong></div>
+                  <div class="detail-item"><span>表示順</span><strong id="subjectDetailSortOrder">-</strong></div>
+                  <div class="detail-item"><span>使用可否</span><strong id="subjectDetailEnabled">-</strong></div>
+                  <div class="detail-item span-2"><span>備考</span><strong id="subjectDetailNote">-</strong></div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="page-income-form" class="page-section">
+          <div class="page-head">
+            <div>
+              <h2 id="incomeFormTitle" class="page-title">収入伝票登録</h2>
+              <p class="page-description">収入伝票を登録し、証憑を同時に添付できます。</p>
+              <div class="required-legend"><span class="required-badge">必須</span> の付いた項目は入力必須です</div>
+            </div>
+            <div class="page-actions wrap-actions">
+              <button id="backToIncomeListButton" class="button secondary" type="button">一覧へ戻る</button>
+              <button id="resetIncomeFormButton" class="button secondary" type="button">入力をリセット</button>
+              <button id="saveIncomeButton" class="button success" type="button">保存</button>
+            </div>
+          </div>
+
+          <div class="card form-card">
+            <div class="form-grid">
+              <label class="field compact-field readonly-field">
+                <span>伝票番号</span>
+                <input type="text" id="incomeFormVoucherNo" placeholder="新規登録時は自動採番" readonly />
+              </label>
+              <label class="field compact-field required-field">
+                <span>年度</span>
+                <select id="incomeFormFiscalYear" required></select>
+              </label>
+              <label class="field compact-field required-field">
+                <span>収入日</span>
+                <input type="date" id="incomeFormDate" required />
+              </label>
+              <label class="field compact-field required-field">
+                <span>科目</span>
+                <select id="incomeFormSubjectSelect" required></select>
+              </label>
+              <label class="field compact-field span-2 required-field">
+                <span>摘要</span>
+                <input type="text" id="incomeFormSummary" placeholder="例：部費収入" required />
+              </label>
+              <label class="field compact-field required-field">
+                <span>入金元</span>
+                <input type="text" id="incomeFormPayer" placeholder="例：部員 / 補助金交付元" required />
+              </label>
+              <label class="field compact-field required-field">
+                <span>収入金額</span>
+                <input type="number" id="incomeFormAmount" min="1" step="1" placeholder="0" required />
+              </label>
+              <label class="field compact-field span-2">
+                <span>備考</span>
+                <textarea id="incomeFormNote" rows="4" placeholder="補足があれば入力"></textarea>
+              </label>
+            </div>
+
+            <div class="form-separator"></div>
+
+            <div class="card-title">証憑添付</div>
+            <div class="upload-grid">
+              <div>
+                <label class="field compact-field">
+                  <span>証憑ファイル</span>
+                  <input type="file" id="incomeFormEvidenceFile" accept="application/pdf,image/jpeg,image/png" />
+                </label>
+                <div class="inline-note">PDF / JPG / PNG、最大5MB</div>
+                <label class="check-row" id="incomeRemoveEvidenceRow">
+                  <input type="checkbox" id="incomeRemoveEvidenceCheckbox" />
+                  <span>既存証憑を削除する</span>
+                </label>
+              </div>
+              <div class="attachment-box">
+                <div class="attachment-title">現在の証憑</div>
+                <div id="incomeFormEvidenceMeta" class="inline-note">未添付</div>
+                <a id="incomeFormEvidenceOpenLink" class="text-link hidden" target="_blank" rel="noopener noreferrer">別タブで開く</a>
+              </div>
+            </div>
+
+            <div class="form-separator"></div>
+
+            <div class="form-footer button-row wrap-actions">
+              <button id="saveIncomeButtonBottom" class="button success" type="button">保存</button>
+            </div>
+          </div>
+        </section>
+
+
+        <section id="page-budget" class="page-section">
+          <div class="page-head">
+            <div>
+              <h2 class="page-title">予算書</h2>
+              <p class="page-description">年度ごとの予算を、科目単位で管理します。実績額は登録済み伝票から自動反映されます。</p>
+            </div>
+            <div class="page-actions wrap-actions">
+              <label class="field compact-field required-field">
+                <span>年度</span>
+                <select id="budgetFiscalYear" required></select>
+              </label>
+              <label class="field compact-field">
+                <span>収支区分</span>
+                <select id="budgetTypeFilter">
+                  <option value="">すべて</option>
+                  <option value="支出">支出</option>
+                  <option value="収入">収入</option>
+                </select>
+              </label>
+              <button id="reloadBudgetButton" class="button secondary" type="button">再読み込み</button>
+              <button id="saveBudgetButton" class="button success" type="button">保存</button>
+            </div>
+          </div>
+
+          <div class="summary-grid budget-summary-grid">
+            <article class="summary-card budget-expense">
+              <div class="summary-label">予算合計</div>
+              <div id="budgetTotalAmount" class="summary-value">0 円</div>
+            </article>
+            <article class="summary-card budget-actual">
+              <div class="summary-label">実績合計</div>
+              <div id="budgetActualAmount" class="summary-value">0 円</div>
+            </article>
+            <article class="summary-card balance">
+              <div class="summary-label">差額合計</div>
+              <div id="budgetDiffAmount" class="summary-value">0 円</div>
+            </article>
+          </div>
+
+          <div class="card table-card budget-table-card">
+            <div class="card-title-row">
+              <div>
+                <div class="card-title">予算明細</div>
+                <div class="inline-note">当初予算額・補正予算額・備考を編集して保存できます。実績額と差額は自動計算です。</div>
+              </div>
+              <div id="budgetCountLabel" class="inline-note">0件</div>
+            </div>
+            <div class="table-wrap budget-table-wrap">
+              <table class="budget-table">
+                <thead>
+                  <tr>
+                    <th>収支区分</th>
+                    <th>科目コード</th>
+                    <th>科目名</th>
+                    <th class="text-right">当初予算額</th>
+                    <th class="text-right">補正予算額</th>
+                    <th class="text-right">予算合計額</th>
+                    <th class="text-right">実績額</th>
+                    <th class="text-right">差額</th>
+                    <th>備考</th>
+                  </tr>
+                </thead>
+                <tbody id="budgetTableBody">
+                  <tr>
+                    <td colspan="9" class="empty-cell">データを読み込んでください</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="page-expense-form" class="page-section">
+          <div class="page-head">
+            <div>
+              <h2 id="expenseFormTitle" class="page-title">支出伝票登録</h2>
+              <p class="page-description">手入力または旅費申請から転記して、証憑を同時に添付できます。</p>
+              <div class="required-legend"><span class="required-badge">必須</span> の付いた項目は入力必須です</div>
+            </div>
+            <div class="page-actions wrap-actions">
+              <button id="backToExpenseListButton" class="button secondary" type="button">一覧へ戻る</button>
+              <button id="resetExpenseFormButton" class="button secondary" type="button">入力をリセット</button>
+              <button id="openTravelTransferFromForm" class="button secondary" type="button">旅費申請から転記</button>
+              <button id="saveExpenseButton" class="button success" type="button">保存</button>
+            </div>
+          </div>
+
+          <div class="card form-card">
+            <div class="form-grid">
+              <label class="field compact-field readonly-field">
+                <span>伝票番号</span>
+                <input type="text" id="formVoucherNo" placeholder="新規登録時は自動採番" readonly />
+              </label>
+              <label class="field compact-field required-field">
+                <span>年度</span>
+                <select id="formFiscalYear" required></select>
+              </label>
+              <label class="field compact-field required-field">
+                <span>支出日</span>
+                <input type="date" id="formExpenseDate" required />
+              </label>
+              <label class="field compact-field required-field">
+                <span>科目</span>
+                <select id="formSubjectSelect" required></select>
+              </label>
+              <label class="field compact-field span-2 required-field">
+                <span>摘要</span>
+                <input type="text" id="formSummary" placeholder="例：大会遠征交通費" required />
+              </label>
+              <label class="field compact-field required-field">
+                <span>支払先</span>
+                <input type="text" id="formPayee" placeholder="例：山田 太郎" required />
+              </label>
+              <label class="field compact-field required-field">
+                <span>支出金額</span>
+                <input type="number" id="formAmount" min="1" step="1" placeholder="0" required />
+              </label>
+              <label class="field compact-field">
+                <span>関連旅費管理番号</span>
+                <input type="text" id="formRelatedTravelControlNo" placeholder="旅費転記時に自動設定" readonly />
+              </label>
+              <label class="field compact-field span-2">
+                <span>備考</span>
+                <textarea id="formNote" rows="4" placeholder="補足があれば入力"></textarea>
+              </label>
+            </div>
+
+            <div class="form-separator"></div>
+
+            <div class="card-title">証憑添付</div>
+            <div class="upload-grid">
+              <div>
+                <label class="field compact-field">
+                  <span>証憑ファイル</span>
+                  <input type="file" id="formEvidenceFile" accept="application/pdf,image/jpeg,image/png" />
+                </label>
+                <div class="inline-note">PDF / JPG / PNG、最大5MB</div>
+                <label class="check-row" id="removeEvidenceRow">
+                  <input type="checkbox" id="removeEvidenceCheckbox" />
+                  <span>既存証憑を削除する</span>
+                </label>
+              </div>
+              <div class="attachment-box">
+                <div class="attachment-title">現在の証憑</div>
+                <div id="formEvidenceMeta" class="inline-note">未添付</div>
+                <a id="formEvidenceOpenLink" class="text-link hidden" target="_blank" rel="noopener noreferrer">別タブで開く</a>
+              </div>
+            </div>
+
+            <div class="form-separator"></div>
+
+            <div class="form-footer button-row wrap-actions">
+              <button id="saveExpenseButtonBottom" class="button success" type="button">保存</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="switchUserModal" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal="switchUserModal"></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>利用者切替</h3>
+        <button class="icon-button" type="button" data-close-modal="switchUserModal">×</button>
+      </div>
+      <div class="modal-body">
+        <label class="field">
+          <span>利用者検索</span>
+          <input type="text" id="switchUserSearchInput" placeholder="氏名で絞り込み" />
+        </label>
+        <div id="switchUserList" class="user-list compact"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="travelTransferModal" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal="travelTransferModal"></div>
+    <div class="modal-dialog wide-dialog">
+      <div class="modal-header">
+        <h3>旅費申請から転記</h3>
+        <button class="icon-button" type="button" data-close-modal="travelTransferModal">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="inline-note modal-note">対象の旅費申請を選択すると、支出伝票登録フォームへ内容を取り込みます。証憑は取り込み後にこの会計画面で添付できます。</p>
+        <div class="modal-toolbar wrap-actions">
+          <label class="field compact-field">
+            <span>年度</span>
+            <select id="travelTransferFiscalYear"></select>
+          </label>
+          <label class="field compact-field grow-field">
+            <span>キーワード</span>
+            <input type="text" id="travelTransferKeyword" placeholder="管理番号 / 旅行名 / 運転者" />
+          </label>
+          <button id="searchTravelTransferButton" class="button primary" type="button">検索</button>
+        </div>
+        <div class="table-wrap modal-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>管理番号</th>
+                <th>年度</th>
+                <th>旅費発生日</th>
+                <th>旅行名</th>
+                <th>運転者</th>
+                <th class="text-right">支給額</th>
+                <th>旅費支払済</th>
+                <th>会計転記状況</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="travelTransferTableBody">
+              <tr>
+                <td colspan="9" class="empty-cell">検索してください</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="memberFormModal" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal="memberFormModal"></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="memberFormModalTitle">部員登録</h3>
+        <button class="icon-button" type="button" data-close-modal="memberFormModal">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="required-legend"><span class="required-badge">必須</span> の付いた項目は入力必須です</div>
+        <div class="form-grid single-form-grid compact-modal-grid">
+          <label class="field required-field">
+            <span>氏名</span>
+            <input type="text" id="memberFormName" placeholder="例：山田 太郎" required />
+          </label>
+        </div>
+        <div class="form-footer button-row wrap-actions modal-footer-actions">
+          <button id="memberFormSaveButton" class="button success" type="button">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="subjectFormModal" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal="subjectFormModal"></div>
+    <div class="modal-dialog wide-dialog">
+      <div class="modal-header">
+        <h3 id="subjectFormModalTitle">科目登録</h3>
+        <button class="icon-button" type="button" data-close-modal="subjectFormModal">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="required-legend"><span class="required-badge">必須</span> の付いた項目は入力必須です</div>
+        <div class="form-grid compact-modal-grid">
+          <label class="field compact-field required-field readonly-field" id="subjectCodeReadonlyRow">
+            <span>科目コード</span>
+            <input type="text" id="subjectFormCode" placeholder="例：EXP010" />
+          </label>
+          <label class="field compact-field required-field">
+            <span>科目名</span>
+            <input type="text" id="subjectFormName" placeholder="例：旅費交通費" required />
+          </label>
+          <label class="field compact-field required-field">
+            <span>収支区分</span>
+            <select id="subjectFormType" required>
+              <option value="">選択してください</option>
+              <option value="支出">支出</option>
+              <option value="収入">収入</option>
+            </select>
+          </label>
+          <label class="field compact-field">
+            <span>表示順</span>
+            <input type="number" id="subjectFormSortOrder" min="0" step="1" placeholder="0" />
+          </label>
+          <label class="field compact-field span-2">
+            <span>備考</span>
+            <textarea id="subjectFormNote" rows="3" placeholder="補足があれば入力"></textarea>
+          </label>
+          <label class="check-row span-2 checkbox-panel">
+            <input type="checkbox" id="subjectFormEnabled" checked />
+            <span>使用可にする</span>
+          </label>
+        </div>
+        <div class="form-footer button-row wrap-actions modal-footer-actions">
+          <button id="subjectFormSaveButton" class="button success" type="button">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/accounting.js"></script>
 </body>
 </html>
