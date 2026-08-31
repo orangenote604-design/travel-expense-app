@@ -865,3 +865,13 @@ td {
     padding-right: 16px;
   }
 }
+
+
+.summary-card.income {
+  background: linear-gradient(180deg, #ffffff 0%, #f7fff9 100%);
+  border-color: #bbf7d0;
+}
+
+.income-action {
+  border-color: #bbf7d0;
+}
