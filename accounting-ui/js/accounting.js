@@ -1630,77 +1630,131 @@ async function loadBudgetPage() {
   if (!state.currentUser) return showUserSelectScreen();
   showLoading('予算書を読み込んでいます...');
   try {
-    const fiscalYear = requireValue(els.budgetFiscalYear.value, '年度を選択してください');
-    const [expenseSubjectsResult, incomeSubjectsResult, budgetResult, settlementResult] = await Promise.all([
+    const fiscalYear = Number(requireValue(els.budgetFiscalYear.value, '年度を選択してください'));
+    const previousFiscalYear = fiscalYear - 1;
+    const [expenseSubjectsResult, incomeSubjectsResult, currentBudgetResult, previousBudgetResult, currentExpenseResult, currentIncomeResult, previousExpenseResult, previousIncomeResult] = await Promise.all([
       apiGet('accounting/listSubjects', { type: '支出' }),
       apiGet('accounting/listSubjects', { type: '収入' }),
       apiGet('accounting/listBudgetRows', { fiscalYear: fiscalYear }),
-      apiGet('accounting/buildSettlementSummary', { fiscalYear: fiscalYear })
+      apiGet('accounting/listBudgetRows', { fiscalYear: previousFiscalYear }),
+      apiGet('accounting/listExpenseVouchers', { fiscalYear: fiscalYear }),
+      apiGet('accounting/listIncomeVouchers', { fiscalYear: fiscalYear }),
+      apiGet('accounting/listExpenseVouchers', { fiscalYear: previousFiscalYear }),
+      apiGet('accounting/listIncomeVouchers', { fiscalYear: previousFiscalYear })
     ]);
 
-    const budgetRows = budgetResult.rows || [];
-    const settlementRows = settlementResult.rows || [];
     const subjectSeedRows = [];
     (expenseSubjectsResult.subjects || []).forEach(function(row) { subjectSeedRows.push(row); });
     (incomeSubjectsResult.subjects || []).forEach(function(row) { subjectSeedRows.push(row); });
 
+    const currentBudgetRows = currentBudgetResult.rows || [];
+    const previousBudgetRows = previousBudgetResult.rows || [];
+    const currentExpenses = currentExpenseResult.vouchers || [];
+    const currentIncomes = currentIncomeResult.vouchers || [];
+    const previousExpenses = previousExpenseResult.vouchers || [];
+    const previousIncomes = previousIncomeResult.vouchers || [];
+
+    const currentActualMap = {};
+    currentExpenses.forEach(function(row) {
+      const key = ['支出', row['科目コード'] || ''].join('|');
+      currentActualMap[key] = Number(currentActualMap[key] || 0) + Number(row['支出金額'] || 0);
+    });
+    currentIncomes.forEach(function(row) {
+      const key = ['収入', row['科目コード'] || ''].join('|');
+      currentActualMap[key] = Number(currentActualMap[key] || 0) + Number(row['収入金額'] || 0);
+    });
+
+    const previousBudgetMap = {};
+    previousBudgetRows.forEach(function(row) {
+      const key = [row['収支区分'] || '', row['科目コード'] || ''].join('|');
+      const initialBudget = Number(row['当初予算額'] || 0);
+      const revisedBudget = Number(row['補正予算額'] || 0);
+      const budgetTotal = Number(row['予算合計額'] || 0);
+      const mergedBudget = initialBudget + revisedBudget;
+      previousBudgetMap[key] = mergedBudget || budgetTotal || 0;
+    });
+
+    const previousSettlementMap = {};
+    previousExpenses.forEach(function(row) {
+      const key = ['支出', row['科目コード'] || ''].join('|');
+      previousSettlementMap[key] = Number(previousSettlementMap[key] || 0) + Number(row['支出金額'] || 0);
+    });
+    previousIncomes.forEach(function(row) {
+      const key = ['収入', row['科目コード'] || ''].join('|');
+      previousSettlementMap[key] = Number(previousSettlementMap[key] || 0) + Number(row['収入金額'] || 0);
+    });
+
     const rowMap = {};
     subjectSeedRows.forEach(function(row) {
-      const key = [row['収支区分'], row['科目コード']].join('|');
+      const key = [row['収支区分'] || '', row['科目コード'] || ''].join('|');
       rowMap[key] = {
-        fiscalYear: Number(fiscalYear),
+        fiscalYear: fiscalYear,
         type: row['収支区分'] || '',
         subjectCode: row['科目コード'] || '',
         subjectName: row['科目名'] || '',
         initialBudget: 0,
         revisedBudget: 0,
-        budgetTotal: 0,
-        actualAmount: 0,
-        diffAmount: 0,
-        note: row['備考'] || '',
+        actualAmount: Number(currentActualMap[key] || 0),
+        previousBudgetAmount: Number(previousBudgetMap[key] || 0),
+        previousSettlementAmount: Number(previousSettlementMap[key] || 0),
+        note: '',
         enabled: String(row['使用可否']) !== 'false',
         createdAt: row['登録日時'] || '',
         updatedAt: row['更新日時'] || ''
       };
     });
 
-    budgetRows.forEach(function(row) {
-      const key = [row['収支区分'], row['科目コード']].join('|');
-      rowMap[key] = Object.assign(rowMap[key] || {}, {
-        fiscalYear: Number(fiscalYear),
-        type: row['収支区分'] || (rowMap[key] && rowMap[key].type) || '',
-        subjectCode: row['科目コード'] || (rowMap[key] && rowMap[key].subjectCode) || '',
-        subjectName: row['科目名'] || (rowMap[key] && rowMap[key].subjectName) || '',
-        initialBudget: Number(row['当初予算額'] || 0),
-        revisedBudget: Number(row['補正予算額'] || 0),
-        budgetTotal: Number(row['予算合計額'] || 0),
-        actualAmount: Number(row['実績額'] || 0),
-        diffAmount: Number(row['差額'] || 0),
+    currentBudgetRows.forEach(function(row) {
+      const key = [row['収支区分'] || '', row['科目コード'] || ''].join('|');
+      const current = rowMap[key] || {};
+      rowMap[key] = Object.assign(current, {
+        fiscalYear: fiscalYear,
+        type: row['収支区分'] || current.type || '',
+        subjectCode: row['科目コード'] || current.subjectCode || '',
+        subjectName: row['科目名'] || current.subjectName || '',
+        initialBudget: Number(row['当初予算額'] || row['予算合計額'] || 0),
+        revisedBudget: 0,
+        actualAmount: Number(currentActualMap[key] || row['実績額'] || 0),
+        previousBudgetAmount: Number(previousBudgetMap[key] || 0),
+        previousSettlementAmount: Number(previousSettlementMap[key] || 0),
         note: row['備考'] || '',
-        createdAt: row['登録日時'] || '',
-        updatedAt: row['更新日時'] || ''
+        createdAt: row['登録日時'] || current.createdAt || '',
+        updatedAt: row['更新日時'] || current.updatedAt || ''
       });
     });
 
-    settlementRows.forEach(function(row) {
-      const key = [row.type, row.subjectCode].join('|');
-      const current = rowMap[key] || {
-        fiscalYear: Number(fiscalYear),
-        type: row.type || '',
-        subjectCode: row.subjectCode || '',
-        subjectName: row.subjectName || '',
+    Object.keys(currentActualMap).forEach(function(key) {
+      if (rowMap[key]) return;
+      const parts = key.split('|');
+      rowMap[key] = {
+        fiscalYear: fiscalYear,
+        type: parts[0] || '',
+        subjectCode: parts[1] || '',
+        subjectName: '',
         initialBudget: 0,
         revisedBudget: 0,
-        budgetTotal: 0,
-        actualAmount: 0,
-        diffAmount: 0,
+        actualAmount: Number(currentActualMap[key] || 0),
+        previousBudgetAmount: Number(previousBudgetMap[key] || 0),
+        previousSettlementAmount: Number(previousSettlementMap[key] || 0),
         note: ''
       };
-      current.actualAmount = Number(row.actualAmount || 0);
-      current.budgetTotal = Number(current.initialBudget || 0) + Number(current.revisedBudget || 0);
-      current.diffAmount = current.budgetTotal - current.actualAmount;
-      if (!current.subjectName) current.subjectName = row.subjectName || '';
-      rowMap[key] = current;
+    });
+
+    Object.keys(previousBudgetMap).concat(Object.keys(previousSettlementMap)).forEach(function(key) {
+      if (rowMap[key]) return;
+      const parts = key.split('|');
+      rowMap[key] = {
+        fiscalYear: fiscalYear,
+        type: parts[0] || '',
+        subjectCode: parts[1] || '',
+        subjectName: '',
+        initialBudget: 0,
+        revisedBudget: 0,
+        actualAmount: Number(currentActualMap[key] || 0),
+        previousBudgetAmount: Number(previousBudgetMap[key] || 0),
+        previousSettlementAmount: Number(previousSettlementMap[key] || 0),
+        note: ''
+      };
     });
 
     state.budgetRows = Object.values(rowMap).filter(function(row) {
@@ -1711,9 +1765,18 @@ async function loadBudgetPage() {
       return String(a.subjectCode || '').localeCompare(String(b.subjectCode || ''), 'ja');
     });
 
+    const previousIncomeTotal = previousIncomes.reduce(function(sum, row) { return sum + Number(row['収入金額'] || 0); }, 0);
+    const previousExpenseTotal = previousExpenses.reduce(function(sum, row) { return sum + Number(row['支出金額'] || 0); }, 0);
+    state.budgetPreviousSummary = {
+      incomeTotal: previousIncomeTotal,
+      expenseTotal: previousExpenseTotal,
+      balance: previousIncomeTotal - previousExpenseTotal
+    };
+
     renderBudgetTable();
   } catch (error) {
     state.budgetRows = [];
+    state.budgetPreviousSummary = { incomeTotal: 0, expenseTotal: 0, balance: 0 };
     renderBudgetTable();
     showToast(error.message, 'error');
   } finally {
@@ -1732,14 +1795,11 @@ function renderBudgetTable() {
   const rows = getFilteredBudgetRows();
   els.budgetCountLabel.textContent = `${rows.length}件`;
   if (!rows.length) {
-    els.budgetTableBody.innerHTML = '<tr><td colspan="9" class="empty-cell">該当する予算データがありません。</td></tr>';
-    updateBudgetSummary([]);
+    els.budgetTableBody.innerHTML = '<tr><td colspan="7" class="empty-cell">該当する予算データがありません。</td></tr>';
+    updateBudgetSummary();
     return;
   }
   els.budgetTableBody.innerHTML = rows.map(function(row, index) {
-    const budgetTotal = Number(row.initialBudget || 0) + Number(row.revisedBudget || 0);
-    const diff = budgetTotal - Number(row.actualAmount || 0);
-    const diffClass = diff < 0 ? 'minus' : 'plus';
     const typeChipClass = row.type === '収入' ? 'income' : 'expense';
     return `
       <tr data-budget-key="${escapeHtml([row.type, row.subjectCode].join('|'))}">
@@ -1747,10 +1807,8 @@ function renderBudgetTable() {
         <td>${escapeHtml(row.subjectCode || '')}</td>
         <td>${escapeHtml(row.subjectName || '')}</td>
         <td><input class="budget-input text-right" type="number" min="0" step="1" data-budget-field="initialBudget" data-budget-index="${index}" value="${escapeAttribute(String(Number(row.initialBudget || 0)))}" /></td>
-        <td><input class="budget-input text-right" type="number" min="0" step="1" data-budget-field="revisedBudget" data-budget-index="${index}" value="${escapeAttribute(String(Number(row.revisedBudget || 0)))}" /></td>
-        <td class="text-right budget-total-cell" data-budget-total="${index}">${escapeHtml(formatNumber(budgetTotal))}</td>
-        <td class="text-right">${escapeHtml(formatNumber(row.actualAmount || 0))}</td>
-        <td class="text-right budget-diff-cell ${diffClass}" data-budget-diff="${index}">${escapeHtml(formatNumber(diff))}</td>
+        <td class="text-right">${escapeHtml(formatNumber(row.previousBudgetAmount || 0))}</td>
+        <td class="text-right">${escapeHtml(formatNumber(row.previousSettlementAmount || 0))}</td>
         <td><input class="budget-note-input" type="text" data-budget-field="note" data-budget-index="${index}" value="${escapeAttribute(row.note || '')}" /></td>
       </tr>
     `;
@@ -1766,51 +1824,29 @@ function renderBudgetTable() {
         target.note = input.value;
       } else {
         target[field] = Number(input.value || 0);
-        updateBudgetRowVisual(index, target, rows);
       }
-      updateBudgetSummary(rows);
     });
   });
-  updateBudgetSummary(rows);
+  updateBudgetSummary();
 }
 
-function updateBudgetRowVisual(index, row, rows) {
-  const budgetTotal = Number(row.initialBudget || 0) + Number(row.revisedBudget || 0);
-  const diff = budgetTotal - Number(row.actualAmount || 0);
-  row.budgetTotal = budgetTotal;
-  row.diffAmount = diff;
-  const totalEl = els.budgetTableBody.querySelector(`[data-budget-total="${index}"]`);
-  const diffEl = els.budgetTableBody.querySelector(`[data-budget-diff="${index}"]`);
-  if (totalEl) totalEl.textContent = formatNumber(budgetTotal);
-  if (diffEl) {
-    diffEl.textContent = formatNumber(diff);
-    diffEl.classList.toggle('plus', diff >= 0);
-    diffEl.classList.toggle('minus', diff < 0);
-  }
-}
-
-function updateBudgetSummary(rows) {
-  const targets = rows || [];
-  const budgetTotal = targets.reduce(function(sum, row) { return sum + Number(row.initialBudget || 0) + Number(row.revisedBudget || 0); }, 0);
-  const actualTotal = targets.reduce(function(sum, row) { return sum + Number(row.actualAmount || 0); }, 0);
-  const diffTotal = budgetTotal - actualTotal;
-  els.budgetTotalAmount.textContent = formatCurrency(budgetTotal);
-  els.budgetActualAmount.textContent = formatCurrency(actualTotal);
-  els.budgetDiffAmount.textContent = formatCurrency(diffTotal);
+function updateBudgetSummary() {
+  const summary = state.budgetPreviousSummary || { incomeTotal: 0, expenseTotal: 0, balance: 0 };
+  els.budgetTotalAmount.textContent = formatCurrency(summary.incomeTotal || 0);
+  els.budgetActualAmount.textContent = formatCurrency(summary.expenseTotal || 0);
+  els.budgetDiffAmount.textContent = formatCurrency(summary.balance || 0);
 }
 
 async function saveBudgetRows() {
   if (!state.currentUser) return showToast('利用者を選択してください', 'error');
   const fiscalYear = requireValue(els.budgetFiscalYear.value, '年度を選択してください');
-  const rows = getFilteredBudgetRows().map(function(row) {
-    const initialBudget = Number(row.initialBudget || 0);
-    const revisedBudget = Number(row.revisedBudget || 0);
+  const rows = (state.budgetRows || []).map(function(row) {
     return {
       type: row.type,
       subjectCode: row.subjectCode,
       subjectName: row.subjectName,
-      initialBudget: initialBudget,
-      revisedBudget: revisedBudget,
+      initialBudget: Number(row.initialBudget || 0),
+      revisedBudget: 0,
       actualAmount: Number(row.actualAmount || 0),
       note: row.note || ''
     };

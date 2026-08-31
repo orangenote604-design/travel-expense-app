@@ -522,7 +522,7 @@
           <div class="page-head">
             <div>
               <h2 class="page-title">予算書</h2>
-              <p class="page-description">年度ごとの予算を、科目単位で管理します。実績額は登録済み伝票から自動反映されます。</p>
+              <p class="page-description">年度ごとの予算を、科目単位で管理します。予算額のみ入力し、前年度予算額と前年度決算額を参照できます。</p>
             </div>
             <div class="page-actions wrap-actions">
               <label class="field compact-field required-field">
@@ -544,15 +544,15 @@
 
           <div class="summary-grid budget-summary-grid">
             <article class="summary-card budget-expense">
-              <div class="summary-label">予算合計</div>
+              <div class="summary-label">前年度収入額合計</div>
               <div id="budgetTotalAmount" class="summary-value">0 円</div>
             </article>
             <article class="summary-card budget-actual">
-              <div class="summary-label">実績合計</div>
+              <div class="summary-label">前年度支出額合計</div>
               <div id="budgetActualAmount" class="summary-value">0 円</div>
             </article>
             <article class="summary-card balance">
-              <div class="summary-label">差額合計</div>
+              <div class="summary-label">差引額</div>
               <div id="budgetDiffAmount" class="summary-value">0 円</div>
             </article>
           </div>
@@ -561,7 +561,7 @@
             <div class="card-title-row">
               <div>
                 <div class="card-title">予算明細</div>
-                <div class="inline-note">当初予算額・補正予算額・備考を編集して保存できます。実績額と差額は自動計算です。</div>
+                <div class="inline-note">予算額と備考を編集して保存できます。前年度予算額と前年度決算額は自動表示です。</div>
               </div>
               <div id="budgetCountLabel" class="inline-note">0件</div>
             </div>
@@ -572,17 +572,15 @@
                     <th>収支区分</th>
                     <th>科目コード</th>
                     <th>科目名</th>
-                    <th class="text-right">当初予算額</th>
-                    <th class="text-right">補正予算額</th>
-                    <th class="text-right">予算合計額</th>
-                    <th class="text-right">実績額</th>
-                    <th class="text-right">差額</th>
+                    <th class="text-right">予算額</th>
+                    <th class="text-right">前年度予算額</th>
+                    <th class="text-right">前年度決算額</th>
                     <th>備考</th>
                   </tr>
                 </thead>
                 <tbody id="budgetTableBody">
                   <tr>
-                    <td colspan="9" class="empty-cell">データを読み込んでください</td>
+                    <td colspan="7" class="empty-cell">データを読み込んでください</td>
                   </tr>
                 </tbody>
               </table>
