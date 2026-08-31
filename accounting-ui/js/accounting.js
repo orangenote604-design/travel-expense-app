@@ -46,7 +46,13 @@ const state = {
     mode: 'create',
     subjectCode: ''
   },
-  budgetRows: []
+  budgetRows: [],
+  budgetPreviousSummary: {
+    incomeTotal: 0,
+    expenseTotal: 0,
+    balance: 0
+  },
+  budgetPdfBlobUrl: ''
 };
 
 const els = {
@@ -219,7 +225,9 @@ const els = {
   budgetFiscalYear: document.getElementById('budgetFiscalYear'),
   budgetTypeFilter: document.getElementById('budgetTypeFilter'),
   reloadBudgetButton: document.getElementById('reloadBudgetButton'),
+  exportBudgetPdfButton: document.getElementById('exportBudgetPdfButton'),
   saveBudgetButton: document.getElementById('saveBudgetButton'),
+  budgetPdfResult: document.getElementById('budgetPdfResult'),
   budgetTotalAmount: document.getElementById('budgetTotalAmount'),
   budgetActualAmount: document.getElementById('budgetActualAmount'),
   budgetDiffAmount: document.getElementById('budgetDiffAmount'),
@@ -376,6 +384,7 @@ function bindEvents() {
   els.reloadBudgetButton.addEventListener('click', function() { loadBudgetPage(); });
   els.budgetFiscalYear.addEventListener('change', function() { loadBudgetPage(); });
   els.budgetTypeFilter.addEventListener('change', function() { renderBudgetTable(); });
+  els.exportBudgetPdfButton.addEventListener('click', generateBudgetPdf);
   els.saveBudgetButton.addEventListener('click', saveBudgetRows);
 
   els.searchTravelTransferButton.addEventListener('click', function() { loadTravelTransferList(); });
@@ -1626,8 +1635,73 @@ async function applyEvidencePayloadForSave(payload, formState, removeChecked) {
 }
 
 
+function clearBudgetPdfResult() {
+  if (state.budgetPdfBlobUrl) {
+    URL.revokeObjectURL(state.budgetPdfBlobUrl);
+    state.budgetPdfBlobUrl = '';
+  }
+  if (!els.budgetPdfResult) return;
+  els.budgetPdfResult.classList.add('hidden');
+  els.budgetPdfResult.innerHTML = '';
+}
+
+function createBlobUrlFromBase64(base64, mimeType) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mimeType || 'application/pdf' }));
+}
+
+function triggerFileDownload(blobUrl, fileName) {
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = fileName || 'budget.pdf';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function renderBudgetPdfResult(result) {
+  if (!els.budgetPdfResult) return;
+  clearBudgetPdfResult();
+  state.budgetPdfBlobUrl = createBlobUrlFromBase64(result.pdfBase64, result.mimeType);
+  els.budgetPdfResult.classList.remove('hidden');
+  els.budgetPdfResult.innerHTML = `
+    <div class="budget-pdf-result-title">予算書PDFを生成しました</div>
+    <div class="budget-pdf-result-meta">ファイル名: ${escapeHtml(result.fileName || '')}${result.createdAt ? ` / 生成日時: ${escapeHtml(result.createdAt)}` : ''}</div>
+    <div class="budget-pdf-result-links">
+      <a href="${escapeAttribute(state.budgetPdfBlobUrl)}" target="_blank" rel="noopener noreferrer">PDFを開く</a>
+      <a href="${escapeAttribute(state.budgetPdfBlobUrl)}" download="${escapeAttribute(result.fileName || 'budget.pdf')}">PDFをダウンロード</a>
+    </div>
+    <div class="budget-pdf-result-note">PDFは一時生成です。画面を閉じるか再読み込みするとリンクは無効になります。</div>
+  `;
+  triggerFileDownload(state.budgetPdfBlobUrl, result.fileName || 'budget.pdf');
+}
+
+async function generateBudgetPdf() {
+  if (!state.currentUser) return showToast('利用者を選択してください', 'error');
+  const fiscalYear = requireValue(els.budgetFiscalYear.value, '年度を選択してください');
+  clearBudgetPdfResult();
+  if (!window.confirm(`${fiscalYear}年度の予算書PDFを生成しますか？`)) return;
+  showLoading('予算書PDFを生成しています...');
+  try {
+    const result = await apiPost('accounting/generateBudgetPdf', {
+      currentUser: state.currentUser,
+      fiscalYear: Number(fiscalYear)
+    });
+    renderBudgetPdfResult(result);
+    showToast('予算書PDFを生成しました', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+
 async function loadBudgetPage() {
   if (!state.currentUser) return showUserSelectScreen();
+  clearBudgetPdfResult();
   showLoading('予算書を読み込んでいます...');
   try {
     const fiscalYear = Number(requireValue(els.budgetFiscalYear.value, '年度を選択してください'));

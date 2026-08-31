@@ -538,6 +538,7 @@
                 </select>
               </label>
               <button id="reloadBudgetButton" class="button secondary" type="button">再読み込み</button>
+              <button id="exportBudgetPdfButton" class="button primary" type="button">PDF出力</button>
               <button id="saveBudgetButton" class="button success" type="button">保存</button>
             </div>
           </div>
@@ -556,6 +557,8 @@
               <div id="budgetDiffAmount" class="summary-value">0 円</div>
             </article>
           </div>
+
+          <div id="budgetPdfResult" class="card budget-pdf-result hidden"></div>
 
           <div class="card table-card budget-table-card">
             <div class="card-title-row">
