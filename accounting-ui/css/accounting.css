@@ -985,3 +985,81 @@ td {
     grid-template-columns: 1fr;
   }
 }
+
+
+.summary-card.balance {
+  background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
+  border-color: #fdba74;
+}
+
+.summary-card.budget-expense {
+  background: linear-gradient(180deg, #ffffff 0%, #eef6ff 100%);
+  border-color: #bfdbfe;
+}
+
+.summary-card.budget-actual {
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
+  border-color: #bbf7d0;
+}
+
+.budget-table-card {
+  padding-bottom: 10px;
+}
+
+.budget-table-wrap {
+  overflow: auto;
+}
+
+.budget-table {
+  min-width: 1240px;
+}
+
+.budget-input,
+.budget-note-input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.budget-note-input {
+  min-width: 220px;
+}
+
+.budget-total-cell {
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+.budget-diff-cell.plus {
+  color: #15803d;
+  font-weight: 800;
+}
+
+.budget-diff-cell.minus {
+  color: #b91c1c;
+  font-weight: 800;
+}
+
+.budget-type-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.budget-type-chip.expense {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.budget-type-chip.income {
+  background: #dcfce7;
+  color: #166534;
+}

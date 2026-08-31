@@ -199,12 +199,12 @@ function setupDatabase() {
     '往復距離'
   ];
 
-  const travelSheet = ensureSheetWithHeaders_(ss, TRAVEL_SHEET_NAME, travelHeaders);
+  const travelSheet = resetSheet_(ss, TRAVEL_SHEET_NAME, travelHeaders);
   travelSheet.getRange(2, 1, Math.max(travelSheet.getMaxRows() - 1, 1), 1).setNumberFormat('yyyy-mm-dd');
 
-  ensureSheetWithHeaders_(ss, MEMBER_SHEET_NAME, memberHeaders);
-  ensureSheetWithHeaders_(ss, TRIP_SHEET_NAME, tripHeaders);
-  ensureReceiptSheetInitialized_(ss);
+  resetSheet_(ss, MEMBER_SHEET_NAME, memberHeaders);
+  resetSheet_(ss, TRIP_SHEET_NAME, tripHeaders);
+  formatReceiptSheet_(ensureSheet_(ss, RECEIPT_SHEET_NAME));
   setupAccountingDatabase_();
 
   return { ok: true };
@@ -1395,15 +1395,30 @@ function listAccountingUsers_(params) {
 
 function listAccountingSubjects_(params) {
   const type = trim_(params.type);
+  const keyword = trim_(params.keyword);
+  const includeDisabled = String(params.includeDisabled) === 'true' || String(params.includeDisabled) === '1';
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(ACCOUNTING_SUBJECT_SHEET_NAME);
   const rows = getSheetDataObjects_(sheet, ACCOUNTING_SUBJECT_HEADERS);
   const items = rows.filter(function(row) {
+    const code = trim_(row['科目コード']);
+    const name = trim_(row['科目名']);
     const kind = trim_(row['収支区分']);
     const enabled = String(row['使用可否']) !== 'false';
-    if (!enabled) return false;
-    if (!type) return true;
-    return kind === type;
+    if (!code && !name) return false;
+    if (!includeDisabled && !enabled) return false;
+    if (type && kind !== type) return false;
+    if (keyword) {
+      const haystack = [code, name, kind, trim_(row['備考'])].join(' ');
+      if (haystack.indexOf(keyword) === -1) return false;
+    }
+    return true;
+  }).sort(function(a, b) {
+    const typeComp = String(a['収支区分'] || '').localeCompare(String(b['収支区分'] || ''), 'ja');
+    if (typeComp !== 0) return typeComp;
+    const orderComp = Number(a['表示順'] || 0) - Number(b['表示順'] || 0);
+    if (orderComp !== 0) return orderComp;
+    return String(a['科目コード'] || '').localeCompare(String(b['科目コード'] || ''), 'ja');
   });
   return { ok: true, subjects: items };
 }
@@ -2325,66 +2340,3 @@ function deleteMemberFromAccounting_(payload) {
   const name = trim_(payload.name || (payload.data && payload.data.name));
   return deleteMember(name);
 }
-
-/*********************************
- * 非破壊セットアップ補助
- *********************************/
-function ensureSheetWithHeaders_(ss, sheetName, headers) {
-  let sheet = ss.getSheetByName(sheetName);
-  if (!sheet) {
-    sheet = ss.insertSheet(sheetName);
-  }
-
-  ensureSheetSize_(sheet, 200, headers.length);
-  const currentHeaders = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
-  const isBlankHeader = currentHeaders.every(function(v) {
-    return trim_(v) === '';
-  });
-
-  if (isBlankHeader) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.getRange(1, 1, 1, headers.length)
-      .setFontWeight('bold')
-      .setBackground('#2563eb')
-      .setFontColor('#ffffff');
-    sheet.setFrozenRows(1);
-    sheet.autoResizeColumns(1, headers.length);
-    return sheet;
-  }
-
-  const headerMismatch = headers.some(function(header, index) {
-    return trim_(currentHeaders[index]) !== header;
-  });
-  if (headerMismatch) {
-    throw new Error('既存シート「' + sheetName + '」のヘッダーが想定と一致しません。データ保護のため setupDatabase を中断しました。');
-  }
-
-  sheet.setFrozenRows(1);
-  ensureHeaderStyle_(sheet, headers.length);
-  return sheet;
-}
-
-function ensureHeaderStyle_(sheet, headerLength) {
-  sheet.getRange(1, 1, 1, headerLength)
-    .setFontWeight('bold')
-    .setBackground('#2563eb')
-    .setFontColor('#ffffff');
-}
-
-function ensureReceiptSheetInitialized_(ss) {
-  const sheet = ensureSheet_(ss, RECEIPT_SHEET_NAME);
-  ensureSheetSize_(sheet, 200, RECEIPT_HEADERS.length);
-
-  const titleCell = trim_(sheet.getRange(1, 1).getValue());
-  const headerValues = sheet.getRange(RECEIPT_HEADER_ROW, 1, 1, RECEIPT_HEADERS.length).getValues()[0];
-  const headerMatches = RECEIPT_HEADERS.every(function(header, index) {
-    return trim_(headerValues[index]) === header;
-  });
-
-  if (!titleCell && !headerMatches) {
-    formatReceiptSheet_(sheet);
-  }
-
-  return sheet;
-}
-

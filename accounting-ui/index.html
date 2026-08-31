@@ -64,7 +64,7 @@
           <button class="side-nav-button" data-page="income-form" type="button">収入伝票登録</button>
           <button class="side-nav-button" data-page="members" type="button">部員一覧</button>
           <button class="side-nav-button" data-page="subjects" type="button">科目一覧</button>
-          <button class="side-nav-button disabled" type="button" disabled>予算書（次工程）</button>
+          <button class="side-nav-button" data-page="budget" type="button">予算書</button>
         </nav>
       </aside>
 
@@ -513,6 +513,79 @@
 
             <div class="form-footer button-row wrap-actions">
               <button id="saveIncomeButtonBottom" class="button success" type="button">保存</button>
+            </div>
+          </div>
+        </section>
+
+
+        <section id="page-budget" class="page-section">
+          <div class="page-head">
+            <div>
+              <h2 class="page-title">予算書</h2>
+              <p class="page-description">年度ごとの予算を、科目単位で管理します。実績額は登録済み伝票から自動反映されます。</p>
+            </div>
+            <div class="page-actions wrap-actions">
+              <label class="field compact-field required-field">
+                <span>年度</span>
+                <select id="budgetFiscalYear" required></select>
+              </label>
+              <label class="field compact-field">
+                <span>収支区分</span>
+                <select id="budgetTypeFilter">
+                  <option value="">すべて</option>
+                  <option value="支出">支出</option>
+                  <option value="収入">収入</option>
+                </select>
+              </label>
+              <button id="reloadBudgetButton" class="button secondary" type="button">再読み込み</button>
+              <button id="saveBudgetButton" class="button success" type="button">保存</button>
+            </div>
+          </div>
+
+          <div class="summary-grid budget-summary-grid">
+            <article class="summary-card budget-expense">
+              <div class="summary-label">予算合計</div>
+              <div id="budgetTotalAmount" class="summary-value">0 円</div>
+            </article>
+            <article class="summary-card budget-actual">
+              <div class="summary-label">実績合計</div>
+              <div id="budgetActualAmount" class="summary-value">0 円</div>
+            </article>
+            <article class="summary-card balance">
+              <div class="summary-label">差額合計</div>
+              <div id="budgetDiffAmount" class="summary-value">0 円</div>
+            </article>
+          </div>
+
+          <div class="card table-card budget-table-card">
+            <div class="card-title-row">
+              <div>
+                <div class="card-title">予算明細</div>
+                <div class="inline-note">当初予算額・補正予算額・備考を編集して保存できます。実績額と差額は自動計算です。</div>
+              </div>
+              <div id="budgetCountLabel" class="inline-note">0件</div>
+            </div>
+            <div class="table-wrap budget-table-wrap">
+              <table class="budget-table">
+                <thead>
+                  <tr>
+                    <th>収支区分</th>
+                    <th>科目コード</th>
+                    <th>科目名</th>
+                    <th class="text-right">当初予算額</th>
+                    <th class="text-right">補正予算額</th>
+                    <th class="text-right">予算合計額</th>
+                    <th class="text-right">実績額</th>
+                    <th class="text-right">差額</th>
+                    <th>備考</th>
+                  </tr>
+                </thead>
+                <tbody id="budgetTableBody">
+                  <tr>
+                    <td colspan="9" class="empty-cell">データを読み込んでください</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </section>
