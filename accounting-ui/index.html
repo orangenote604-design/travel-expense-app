@@ -314,6 +314,7 @@
             <div>
               <h2 id="incomeFormTitle" class="page-title">収入伝票登録</h2>
               <p class="page-description">収入伝票を登録し、証憑を同時に添付できます。</p>
+              <div class="required-legend"><span class="required-badge">必須</span> の付いた項目は入力必須です</div>
             </div>
             <div class="page-actions wrap-actions">
               <button id="backToIncomeListButton" class="button secondary" type="button">一覧へ戻る</button>
@@ -328,29 +329,29 @@
                 <span>伝票番号</span>
                 <input type="text" id="incomeFormVoucherNo" placeholder="新規登録時は自動採番" readonly />
               </label>
-              <label class="field compact-field">
+              <label class="field compact-field required-field">
                 <span>年度</span>
-                <select id="incomeFormFiscalYear"></select>
+                <select id="incomeFormFiscalYear" required></select>
               </label>
-              <label class="field compact-field">
+              <label class="field compact-field required-field">
                 <span>収入日</span>
-                <input type="date" id="incomeFormDate" />
+                <input type="date" id="incomeFormDate" required />
               </label>
-              <label class="field compact-field">
+              <label class="field compact-field required-field">
                 <span>科目</span>
-                <select id="incomeFormSubjectSelect"></select>
+                <select id="incomeFormSubjectSelect" required></select>
               </label>
-              <label class="field compact-field span-2">
+              <label class="field compact-field span-2 required-field">
                 <span>摘要</span>
-                <input type="text" id="incomeFormSummary" placeholder="例：部費収入" />
+                <input type="text" id="incomeFormSummary" placeholder="例：部費収入" required />
               </label>
-              <label class="field compact-field">
+              <label class="field compact-field required-field">
                 <span>入金元</span>
-                <input type="text" id="incomeFormPayer" placeholder="例：部員 / 補助金交付元" />
+                <input type="text" id="incomeFormPayer" placeholder="例：部員 / 補助金交付元" required />
               </label>
-              <label class="field compact-field">
+              <label class="field compact-field required-field">
                 <span>収入金額</span>
-                <input type="number" id="incomeFormAmount" min="0" step="1" placeholder="0" />
+                <input type="number" id="incomeFormAmount" min="1" step="1" placeholder="0" required />
               </label>
               <label class="field compact-field span-2">
                 <span>備考</span>
@@ -384,7 +385,6 @@
 
             <div class="form-footer button-row wrap-actions">
               <button id="saveIncomeButtonBottom" class="button success" type="button">保存</button>
-              <button id="saveIncomeAndOpenListButton" class="button primary" type="button">保存して一覧を見る</button>
             </div>
           </div>
         </section>
@@ -394,6 +394,7 @@
             <div>
               <h2 id="expenseFormTitle" class="page-title">支出伝票登録</h2>
               <p class="page-description">手入力または旅費申請から転記して、証憑を同時に添付できます。</p>
+              <div class="required-legend"><span class="required-badge">必須</span> の付いた項目は入力必須です</div>
             </div>
             <div class="page-actions wrap-actions">
               <button id="backToExpenseListButton" class="button secondary" type="button">一覧へ戻る</button>
@@ -409,29 +410,29 @@
                 <span>伝票番号</span>
                 <input type="text" id="formVoucherNo" placeholder="新規登録時は自動採番" readonly />
               </label>
-              <label class="field compact-field">
+              <label class="field compact-field required-field">
                 <span>年度</span>
-                <select id="formFiscalYear"></select>
+                <select id="formFiscalYear" required></select>
               </label>
-              <label class="field compact-field">
+              <label class="field compact-field required-field">
                 <span>支出日</span>
-                <input type="date" id="formExpenseDate" />
+                <input type="date" id="formExpenseDate" required />
               </label>
-              <label class="field compact-field">
+              <label class="field compact-field required-field">
                 <span>科目</span>
-                <select id="formSubjectSelect"></select>
+                <select id="formSubjectSelect" required></select>
               </label>
-              <label class="field compact-field span-2">
+              <label class="field compact-field span-2 required-field">
                 <span>摘要</span>
-                <input type="text" id="formSummary" placeholder="例：大会遠征交通費" />
+                <input type="text" id="formSummary" placeholder="例：大会遠征交通費" required />
               </label>
-              <label class="field compact-field">
+              <label class="field compact-field required-field">
                 <span>支払先</span>
-                <input type="text" id="formPayee" placeholder="例：山田 太郎" />
+                <input type="text" id="formPayee" placeholder="例：山田 太郎" required />
               </label>
-              <label class="field compact-field">
+              <label class="field compact-field required-field">
                 <span>支出金額</span>
-                <input type="number" id="formAmount" min="0" step="1" placeholder="0" />
+                <input type="number" id="formAmount" min="1" step="1" placeholder="0" required />
               </label>
               <label class="field compact-field">
                 <span>関連旅費管理番号</span>
@@ -469,7 +470,6 @@
 
             <div class="form-footer button-row wrap-actions">
               <button id="saveExpenseButtonBottom" class="button success" type="button">保存</button>
-              <button id="saveAndOpenListButton" class="button primary" type="button">保存して一覧を見る</button>
             </div>
           </div>
         </section>

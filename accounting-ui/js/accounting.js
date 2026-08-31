@@ -114,7 +114,6 @@ const els = {
   openTravelTransferFromForm: document.getElementById('openTravelTransferFromForm'),
   saveExpenseButton: document.getElementById('saveExpenseButton'),
   saveExpenseButtonBottom: document.getElementById('saveExpenseButtonBottom'),
-  saveAndOpenListButton: document.getElementById('saveAndOpenListButton'),
 
   incomeFiscalYear: document.getElementById('incomeFiscalYear'),
   incomeKeyword: document.getElementById('incomeKeyword'),
@@ -160,7 +159,6 @@ const els = {
   resetIncomeFormButton: document.getElementById('resetIncomeFormButton'),
   saveIncomeButton: document.getElementById('saveIncomeButton'),
   saveIncomeButtonBottom: document.getElementById('saveIncomeButtonBottom'),
-  saveIncomeAndOpenListButton: document.getElementById('saveIncomeAndOpenListButton'),
 
   travelTransferModal: document.getElementById('travelTransferModal'),
   travelTransferFiscalYear: document.getElementById('travelTransferFiscalYear'),
@@ -241,7 +239,6 @@ function bindEvents() {
   els.openTravelTransferFromForm.addEventListener('click', function() { openTravelTransferModal(); });
   els.saveExpenseButton.addEventListener('click', function() { saveExpense(false); });
   els.saveExpenseButtonBottom.addEventListener('click', function() { saveExpense(false); });
-  els.saveAndOpenListButton.addEventListener('click', function() { saveExpense(true); });
   els.formEvidenceFile.addEventListener('change', onExpenseEvidenceFileChange);
   els.removeEvidenceCheckbox.addEventListener('change', renderExpenseFormEvidenceInfo);
 
@@ -272,7 +269,6 @@ function bindEvents() {
   });
   els.saveIncomeButton.addEventListener('click', function() { saveIncome(false); });
   els.saveIncomeButtonBottom.addEventListener('click', function() { saveIncome(false); });
-  els.saveIncomeAndOpenListButton.addEventListener('click', function() { saveIncome(true); });
   els.incomeFormEvidenceFile.addEventListener('change', onIncomeEvidenceFileChange);
   els.incomeRemoveEvidenceCheckbox.addEventListener('change', renderIncomeFormEvidenceInfo);
 
@@ -728,20 +724,24 @@ function onExpenseEvidenceFileChange(event) {
 
 function buildExpenseDataFromForm() {
   const selectedOption = els.formSubjectSelect.options[els.formSubjectSelect.selectedIndex];
-  const subjectCode = els.formSubjectSelect.value;
+  const subjectCode = requireValue(els.formSubjectSelect.value, '科目を選択してください');
   const subjectName = selectedOption ? selectedOption.dataset.subjectName || '' : '';
-  if (!subjectCode || !subjectName) throw new Error('科目を選択してください');
+  if (!subjectName) throw new Error('科目を選択してください');
+  const expenseDate = requireValue(els.formExpenseDate.value, '支出日を入力してください');
+  const summary = requireValue(els.formSummary.value, '摘要を入力してください').trim();
+  const payee = requireValue(els.formPayee.value, '支払先を入力してください').trim();
+  const amount = requirePositiveNumber(els.formAmount.value, '支出金額を入力してください');
   return {
-    fiscalYear: Number(els.formFiscalYear.value),
+    fiscalYear: Number(requireValue(els.formFiscalYear.value, '年度を選択してください')),
     subjectCode: subjectCode,
     subjectName: subjectName,
-    expenseDate: els.formExpenseDate.value,
-    amount: Number(els.formAmount.value || 0),
-    summary: els.formSummary.value.trim(),
+    expenseDate: expenseDate,
+    amount: amount,
+    summary: summary,
     note: els.formNote.value.trim(),
-    payee: els.formPayee.value.trim(),
+    payee: payee,
     paymentStatus: '支払済',
-    paymentDate: els.formExpenseDate.value,
+    paymentDate: expenseDate,
     relatedTravelControlNo: els.formRelatedTravelControlNo.value.trim()
   };
 }
@@ -758,20 +758,22 @@ async function saveExpense(openListAfterSave) {
     const savedVoucherNo = result.voucherNo || payload.voucherNo;
     showToast(state.expenseForm.mode === 'edit' ? '支出伝票を更新しました' : '支出伝票を登録しました', 'success');
     await loadHomeSummary();
-    if (savedVoucherNo) {
-      const detail = await apiGet('accounting/getExpenseVoucher', { voucherNo: savedVoucherNo });
-      state.selectedExpense = detail;
-      openExpenseEditForm(detail.voucher, detail.evidence || null);
-      if (openListAfterSave) {
+    if (openListAfterSave) {
+      if (savedVoucherNo) {
+        const detail = await apiGet('accounting/getExpenseVoucher', { voucherNo: savedVoucherNo });
+        state.selectedExpense = detail;
         switchPage('expenses');
         els.expenseFiscalYear.value = String(detail.voucher['年度'] || els.expenseFiscalYear.value);
         await loadExpenseList();
         await loadExpenseDetail(savedVoucherNo);
+      } else {
+        switchPage('expenses');
+        await loadExpenseList();
       }
-    } else if (openListAfterSave) {
-      switchPage('expenses');
-      await loadExpenseList();
+      return;
     }
+    prepareExpenseForm('create');
+    switchPage('home');
   } catch (error) {
     showToast(error.message, 'error');
   } finally {
@@ -953,20 +955,24 @@ function onIncomeEvidenceFileChange(event) {
 
 function buildIncomeDataFromForm() {
   const selectedOption = els.incomeFormSubjectSelect.options[els.incomeFormSubjectSelect.selectedIndex];
-  const subjectCode = els.incomeFormSubjectSelect.value;
+  const subjectCode = requireValue(els.incomeFormSubjectSelect.value, '科目を選択してください');
   const subjectName = selectedOption ? selectedOption.dataset.subjectName || '' : '';
-  if (!subjectCode || !subjectName) throw new Error('科目を選択してください');
+  if (!subjectName) throw new Error('科目を選択してください');
+  const incomeDate = requireValue(els.incomeFormDate.value, '収入日を入力してください');
+  const summary = requireValue(els.incomeFormSummary.value, '摘要を入力してください').trim();
+  const payer = requireValue(els.incomeFormPayer.value, '入金元を入力してください').trim();
+  const amount = requirePositiveNumber(els.incomeFormAmount.value, '収入金額を入力してください');
   return {
-    fiscalYear: Number(els.incomeFormFiscalYear.value),
+    fiscalYear: Number(requireValue(els.incomeFormFiscalYear.value, '年度を選択してください')),
     subjectCode: subjectCode,
     subjectName: subjectName,
-    incomeDate: els.incomeFormDate.value,
-    amount: Number(els.incomeFormAmount.value || 0),
-    summary: els.incomeFormSummary.value.trim(),
+    incomeDate: incomeDate,
+    amount: amount,
+    summary: summary,
     note: els.incomeFormNote.value.trim(),
-    payer: els.incomeFormPayer.value.trim(),
+    payer: payer,
     paymentStatus: '入金済',
-    paymentDate: els.incomeFormDate.value
+    paymentDate: incomeDate
   };
 }
 
@@ -982,20 +988,22 @@ async function saveIncome(openListAfterSave) {
     const savedVoucherNo = result.voucherNo || payload.voucherNo;
     showToast(state.incomeForm.mode === 'edit' ? '収入伝票を更新しました' : '収入伝票を登録しました', 'success');
     await loadHomeSummary();
-    if (savedVoucherNo) {
-      const detail = await apiGet('accounting/getIncomeVoucher', { voucherNo: savedVoucherNo });
-      state.selectedIncome = detail;
-      openIncomeEditForm(detail.voucher, detail.evidence || null);
-      if (openListAfterSave) {
+    if (openListAfterSave) {
+      if (savedVoucherNo) {
+        const detail = await apiGet('accounting/getIncomeVoucher', { voucherNo: savedVoucherNo });
+        state.selectedIncome = detail;
         switchPage('incomes');
         els.incomeFiscalYear.value = String(detail.voucher['年度'] || els.incomeFiscalYear.value);
         await loadIncomeList();
         await loadIncomeDetail(savedVoucherNo);
+      } else {
+        switchPage('incomes');
+        await loadIncomeList();
       }
-    } else if (openListAfterSave) {
-      switchPage('incomes');
-      await loadIncomeList();
+      return;
     }
+    prepareIncomeForm('create');
+    switchPage('home');
   } catch (error) {
     showToast(error.message, 'error');
   } finally {
@@ -1184,6 +1192,18 @@ async function applyEvidencePayloadForSave(payload, formState, removeChecked) {
   } else if (formState.mode === 'edit' && removeChecked && formState.existingEvidence) {
     payload.evidenceOp = 'remove';
   }
+}
+
+function requireValue(value, message) {
+  if (value === null || value === undefined) throw new Error(message);
+  if (typeof value === 'string' && !value.trim()) throw new Error(message);
+  return value;
+}
+
+function requirePositiveNumber(value, message) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) throw new Error(message);
+  return number;
 }
 
 function toBoolean(value) {
