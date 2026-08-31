@@ -46,7 +46,6 @@ const els = {
   refreshHomeButton: document.getElementById('refreshHomeButton'),
   homeExpenseCount: document.getElementById('homeExpenseCount'),
   homeExpenseTotal: document.getElementById('homeExpenseTotal'),
-  homeUnpaidCount: document.getElementById('homeUnpaidCount'),
   homeEvidenceCount: document.getElementById('homeEvidenceCount'),
   goExpensesButton: document.getElementById('goExpensesButton'),
   goExpenseCreateButton: document.getElementById('goExpenseCreateButton'),
@@ -54,7 +53,6 @@ const els = {
   openTravelTransferFromHome: document.getElementById('openTravelTransferFromHome'),
   expenseFiscalYear: document.getElementById('expenseFiscalYear'),
   expenseKeyword: document.getElementById('expenseKeyword'),
-  expenseStatus: document.getElementById('expenseStatus'),
   searchExpensesButton: document.getElementById('searchExpensesButton'),
   openExpenseCreateButton: document.getElementById('openExpenseCreateButton'),
   openTravelTransferButton: document.getElementById('openTravelTransferButton'),
@@ -63,14 +61,12 @@ const els = {
   expenseDetailEmpty: document.getElementById('expenseDetailEmpty'),
   expenseDetailBody: document.getElementById('expenseDetailBody'),
   editExpenseButton: document.getElementById('editExpenseButton'),
-  togglePaymentButton: document.getElementById('togglePaymentButton'),
   deleteExpenseButton: document.getElementById('deleteExpenseButton'),
   detailVoucherNo: document.getElementById('detailVoucherNo'),
   detailFiscalYear: document.getElementById('detailFiscalYear'),
   detailSubjectCode: document.getElementById('detailSubjectCode'),
   detailSubjectName: document.getElementById('detailSubjectName'),
   detailExpenseDate: document.getElementById('detailExpenseDate'),
-  detailPaymentStatus: document.getElementById('detailPaymentStatus'),
   detailSummary: document.getElementById('detailSummary'),
   detailPayee: document.getElementById('detailPayee'),
   detailAmount: document.getElementById('detailAmount'),
@@ -87,8 +83,6 @@ const els = {
   formVoucherNo: document.getElementById('formVoucherNo'),
   formFiscalYear: document.getElementById('formFiscalYear'),
   formExpenseDate: document.getElementById('formExpenseDate'),
-  formPaymentStatus: document.getElementById('formPaymentStatus'),
-  formPaymentDate: document.getElementById('formPaymentDate'),
   formSubjectSelect: document.getElementById('formSubjectSelect'),
   formSummary: document.getElementById('formSummary'),
   formPayee: document.getElementById('formPayee'),
@@ -189,7 +183,6 @@ function bindEvents() {
   });
 
   els.deleteExpenseButton.addEventListener('click', deleteSelectedExpense);
-  els.togglePaymentButton.addEventListener('click', toggleSelectedExpensePaymentStatus);
 
   els.backToExpenseListButton.addEventListener('click', function() {
     switchPage('expenses');
@@ -223,14 +216,6 @@ function bindEvents() {
 
   els.formEvidenceFile.addEventListener('change', onEvidenceFileChange);
   els.removeEvidenceCheckbox.addEventListener('change', renderFormEvidenceInfo);
-
-  els.formPaymentStatus.addEventListener('change', function() {
-    if (els.formPaymentStatus.value === '未払') {
-      els.formPaymentDate.value = '';
-    } else if (!els.formPaymentDate.value) {
-      els.formPaymentDate.value = todayInputValue();
-    }
-  });
 
   els.searchTravelTransferButton.addEventListener('click', function() {
     loadTravelTransferList();
@@ -540,16 +525,12 @@ async function loadHomeSummary() {
     const total = rows.reduce(function(sum, row) {
       return sum + Number(row['支出金額'] || 0);
     }, 0);
-    const unpaidCount = rows.filter(function(row) {
-      return String(row['支払状況'] || '') === '未払';
-    }).length;
     const evidenceCount = rows.filter(function(row) {
       return toBoolean(row['証憑有無']);
     }).length;
 
     els.homeExpenseCount.textContent = String(rows.length);
     els.homeExpenseTotal.textContent = formatCurrency(total);
-    els.homeUnpaidCount.textContent = String(unpaidCount);
     els.homeEvidenceCount.textContent = String(evidenceCount);
   } catch (error) {
     showToast(error.message, 'error');
@@ -568,8 +549,7 @@ async function loadExpenseList() {
   try {
     const result = await apiGet('accounting/listExpenseVouchers', {
       fiscalYear: els.expenseFiscalYear.value,
-      keyword: els.expenseKeyword.value,
-      status: els.expenseStatus.value
+      keyword: els.expenseKeyword.value
     });
 
     state.expenseRows = result.vouchers || [];
@@ -590,7 +570,7 @@ function renderExpenseTable() {
   els.expenseCountLabel.textContent = `${rows.length}件`;
 
   if (!rows.length) {
-    els.expenseTableBody.innerHTML = '<tr><td colspan="9" class="empty-cell">該当データがありません。</td></tr>';
+    els.expenseTableBody.innerHTML = '<tr><td colspan="8" class="empty-cell">該当データがありません。</td></tr>';
     return;
   }
 
@@ -600,7 +580,6 @@ function renderExpenseTable() {
 
   els.expenseTableBody.innerHTML = rows.map(function(row) {
     const voucherNo = row['伝票番号'] || '';
-    const status = row['支払状況'] || '';
     const hasEvidence = toBoolean(row['証憑有無']);
     const selectedClass = voucherNo === selectedVoucherNo ? ' class="selected-row"' : '';
     return `
@@ -612,7 +591,6 @@ function renderExpenseTable() {
         <td class="text-right">${escapeHtml(formatNumber(row['支出金額']))}</td>
         <td>${escapeHtml(row['摘要'] || '')}</td>
         <td>${escapeHtml(row['支払先'] || '')}</td>
-        <td>${renderStatusBadge(status)}</td>
         <td>${hasEvidence ? '<span class="badge yes">あり</span>' : '<span class="badge none">なし</span>'}</td>
       </tr>
     `;
@@ -649,7 +627,6 @@ function clearExpenseDetail() {
   els.evidenceOpenLink.classList.add('hidden');
   els.evidenceOpenLink.removeAttribute('href');
   els.editExpenseButton.disabled = true;
-  els.togglePaymentButton.disabled = true;
   els.deleteExpenseButton.disabled = true;
 }
 
@@ -657,7 +634,6 @@ function renderExpenseDetail(voucher, evidence) {
   els.expenseDetailEmpty.classList.add('hidden');
   els.expenseDetailBody.classList.remove('hidden');
   els.editExpenseButton.disabled = false;
-  els.togglePaymentButton.disabled = false;
   els.deleteExpenseButton.disabled = false;
 
   els.detailVoucherNo.textContent = voucher['伝票番号'] || '-';
@@ -665,7 +641,6 @@ function renderExpenseDetail(voucher, evidence) {
   els.detailSubjectCode.textContent = voucher['科目コード'] || '-';
   els.detailSubjectName.textContent = voucher['科目名'] || '-';
   els.detailExpenseDate.textContent = formatDateLike(voucher['支出日']);
-  els.detailPaymentStatus.textContent = voucher['支払状況'] || '-';
   els.detailSummary.textContent = voucher['摘要'] || '-';
   els.detailPayee.textContent = voucher['支払先'] || '-';
   els.detailAmount.textContent = formatCurrency(voucher['支出金額'] || 0);
@@ -675,7 +650,6 @@ function renderExpenseDetail(voucher, evidence) {
   els.detailUpdatedBy.textContent = voucher['更新者'] || '-';
   els.detailCreatedAt.textContent = voucher['登録日時'] || '-';
   els.detailUpdatedAt.textContent = voucher['更新日時'] || '-';
-  els.togglePaymentButton.textContent = voucher['支払状況'] === '支払済' ? '未払へ戻す' : '支払済にする';
 
   renderEvidencePreview(evidence);
 }
@@ -738,8 +712,6 @@ function prepareExpenseForm(mode, options) {
     els.formFiscalYear.value = String(voucher['年度'] || getFiscalYearFromDate(new Date()));
     renderSubjectOptions(voucher['科目コード'] || '');
     els.formExpenseDate.value = toDateInputValue(voucher['支出日']);
-    els.formPaymentStatus.value = voucher['支払状況'] || '未払';
-    els.formPaymentDate.value = toDateInputValue(voucher['支払日']);
     els.formSummary.value = voucher['摘要'] || '';
     els.formPayee.value = voucher['支払先'] || '';
     els.formAmount.value = toNumericInputValue(voucher['支出金額']);
@@ -757,8 +729,6 @@ function prepareExpenseForm(mode, options) {
   els.formFiscalYear.value = String(travel ? (travel.fiscalYear || getFiscalYearFromDate(new Date())) : getFiscalYearFromDate(new Date()));
   renderSubjectOptions('EXP001');
   els.formExpenseDate.value = travel ? toDateInputValue(travel.travelDate) : todayInputValue();
-  els.formPaymentStatus.value = '未払';
-  els.formPaymentDate.value = '';
   els.formSummary.value = travel ? [travel.tripName, travel.driverName].filter(Boolean).join(' / ') : '';
   els.formPayee.value = travel ? (travel.driverName || '') : '';
   els.formAmount.value = travel ? toNumericInputValue(travel.paymentAmount) : '';
@@ -846,8 +816,8 @@ function buildExpenseDataFromForm() {
     summary: els.formSummary.value.trim(),
     note: els.formNote.value.trim(),
     payee: els.formPayee.value.trim(),
-    paymentStatus: els.formPaymentStatus.value,
-    paymentDate: els.formPaymentDate.value,
+    paymentStatus: '支払済',
+    paymentDate: els.formExpenseDate.value,
     relatedTravelControlNo: els.formRelatedTravelControlNo.value.trim()
   };
 }
@@ -934,36 +904,6 @@ async function deleteSelectedExpense() {
   }
 }
 
-async function toggleSelectedExpensePaymentStatus() {
-  if (!state.selectedExpense || !state.selectedExpense.voucher) return;
-
-  const voucher = state.selectedExpense.voucher;
-  const nextStatus = voucher['支払状況'] === '支払済' ? '未払' : '支払済';
-  const nextPaymentDate = nextStatus === '支払済' ? todayInputValue() : '';
-
-  if (!window.confirm(`${voucher['伝票番号']} を「${nextStatus}」に変更します。`)) {
-    return;
-  }
-
-  showLoading('支払状況を更新しています...');
-  try {
-    await apiPost('accounting/setExpensePaymentStatus', {
-      voucherNo: voucher['伝票番号'],
-      paymentStatus: nextStatus,
-      paymentDate: nextPaymentDate,
-      currentUser: state.currentUser
-    });
-    showToast('支払状況を更新しました', 'success');
-    await loadHomeSummary();
-    await loadExpenseList();
-    await loadExpenseDetail(voucher['伝票番号']);
-  } catch (error) {
-    showToast(error.message, 'error');
-  } finally {
-    hideLoading();
-  }
-}
-
 async function openTravelTransferModal() {
   if (!state.currentUser) {
     showToast('利用者を選択してください', 'error');
@@ -1042,13 +982,6 @@ async function applyTravelTransfer(controlNo) {
   } finally {
     hideLoading();
   }
-}
-
-function renderStatusBadge(status) {
-  if (status === '支払済') {
-    return '<span class="badge paid">支払済</span>';
-  }
-  return '<span class="badge unpaid">未払</span>';
 }
 
 function toBoolean(value) {

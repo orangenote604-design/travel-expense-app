@@ -93,10 +93,6 @@
               <div id="homeExpenseTotal" class="summary-value">0 円</div>
             </article>
             <article class="summary-card">
-              <div class="summary-label">未払件数</div>
-              <div id="homeUnpaidCount" class="summary-value">0</div>
-            </article>
-            <article class="summary-card">
               <div class="summary-label">証憑あり件数</div>
               <div id="homeEvidenceCount" class="summary-value">0</div>
             </article>
@@ -128,14 +124,6 @@
                 <span>キーワード</span>
                 <input type="text" id="expenseKeyword" placeholder="伝票番号 / 科目 / 摘要 / 支払先" />
               </label>
-              <label class="field compact-field">
-                <span>支払状況</span>
-                <select id="expenseStatus">
-                  <option value="">すべて</option>
-                  <option value="未払">未払</option>
-                  <option value="支払済">支払済</option>
-                </select>
-              </label>
               <button id="searchExpensesButton" class="button primary" type="button">検索</button>
               <button id="openExpenseCreateButton" class="button success" type="button">新規登録</button>
               <button id="openTravelTransferButton" class="button secondary" type="button">旅費申請から転記</button>
@@ -159,13 +147,12 @@
                       <th class="text-right">支出金額</th>
                       <th>摘要</th>
                       <th>支払先</th>
-                      <th>支払状況</th>
                       <th>証憑</th>
                     </tr>
                   </thead>
                   <tbody id="expenseTableBody">
                     <tr>
-                      <td colspan="9" class="empty-cell">データを読み込んでください</td>
+                      <td colspan="8" class="empty-cell">データを読み込んでください</td>
                     </tr>
                   </tbody>
                 </table>
@@ -177,7 +164,6 @@
                 <div class="card-title">伝票詳細</div>
                 <div class="button-row tight-row">
                   <button id="editExpenseButton" class="button secondary small" type="button" disabled>編集</button>
-                  <button id="togglePaymentButton" class="button warning small" type="button" disabled>支払状況変更</button>
                   <button id="deleteExpenseButton" class="button danger small" type="button" disabled>削除</button>
                 </div>
               </div>
@@ -190,7 +176,6 @@
                   <div class="detail-item"><span>科目コード</span><strong id="detailSubjectCode">-</strong></div>
                   <div class="detail-item"><span>科目名</span><strong id="detailSubjectName">-</strong></div>
                   <div class="detail-item"><span>支出日</span><strong id="detailExpenseDate">-</strong></div>
-                  <div class="detail-item"><span>支払状況</span><strong id="detailPaymentStatus">-</strong></div>
                   <div class="detail-item span-2"><span>摘要</span><strong id="detailSummary">-</strong></div>
                   <div class="detail-item span-2"><span>支払先</span><strong id="detailPayee">-</strong></div>
                   <div class="detail-item"><span>支出金額</span><strong id="detailAmount">-</strong></div>
@@ -246,17 +231,6 @@
                 <input type="date" id="formExpenseDate" />
               </label>
               <label class="field compact-field">
-                <span>支払状況</span>
-                <select id="formPaymentStatus">
-                  <option value="未払">未払</option>
-                  <option value="支払済">支払済</option>
-                </select>
-              </label>
-              <label class="field compact-field">
-                <span>支払日</span>
-                <input type="date" id="formPaymentDate" />
-              </label>
-              <label class="field compact-field">
                 <span>科目</span>
                 <select id="formSubjectSelect"></select>
               </label>
@@ -274,7 +248,7 @@
               </label>
               <label class="field compact-field">
                 <span>関連旅費管理番号</span>
-                <input type="text" id="formRelatedTravelControlNo" placeholder="旅費転記時に自動設定" />
+                <input type="text" id="formRelatedTravelControlNo" placeholder="旅費転記時に自動設定" readonly />
               </label>
               <label class="field compact-field span-2">
                 <span>備考</span>
