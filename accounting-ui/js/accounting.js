@@ -33,6 +33,18 @@ const state = {
     voucherNo: '',
     existingEvidence: null,
     pendingEvidenceFile: null
+  },
+  memberRows: [],
+  selectedMember: null,
+  memberForm: {
+    mode: 'create',
+    originalName: ''
+  },
+  subjectMasterRows: [],
+  selectedSubject: null,
+  subjectForm: {
+    mode: 'create',
+    subjectCode: ''
   }
 };
 
@@ -53,12 +65,9 @@ const els = {
   switchUserList: document.getElementById('switchUserList'),
   homeFiscalYear: document.getElementById('homeFiscalYear'),
   refreshHomeButton: document.getElementById('refreshHomeButton'),
-  homeExpenseCount: document.getElementById('homeExpenseCount'),
   homeExpenseTotal: document.getElementById('homeExpenseTotal'),
-  homeEvidenceCount: document.getElementById('homeEvidenceCount'),
-  homeIncomeCount: document.getElementById('homeIncomeCount'),
   homeIncomeTotal: document.getElementById('homeIncomeTotal'),
-  homeIncomeEvidenceCount: document.getElementById('homeIncomeEvidenceCount'),
+  homeBalanceTotal: document.getElementById('homeBalanceTotal'),
   goExpensesButton: document.getElementById('goExpensesButton'),
   goExpenseCreateButton: document.getElementById('goExpenseCreateButton'),
   goIncomesButton: document.getElementById('goIncomesButton'),
@@ -159,6 +168,51 @@ const els = {
   resetIncomeFormButton: document.getElementById('resetIncomeFormButton'),
   saveIncomeButton: document.getElementById('saveIncomeButton'),
   saveIncomeButtonBottom: document.getElementById('saveIncomeButtonBottom'),
+
+
+  memberKeyword: document.getElementById('memberKeyword'),
+  searchMembersButton: document.getElementById('searchMembersButton'),
+  reloadMembersButton: document.getElementById('reloadMembersButton'),
+  openMemberCreateButton: document.getElementById('openMemberCreateButton'),
+  memberCountLabel: document.getElementById('memberCountLabel'),
+  memberTableBody: document.getElementById('memberTableBody'),
+  memberDetailEmpty: document.getElementById('memberDetailEmpty'),
+  memberDetailBody: document.getElementById('memberDetailBody'),
+  memberDetailName: document.getElementById('memberDetailName'),
+  editMemberButton: document.getElementById('editMemberButton'),
+  deleteMemberButton: document.getElementById('deleteMemberButton'),
+  memberFormModal: document.getElementById('memberFormModal'),
+  memberFormModalTitle: document.getElementById('memberFormModalTitle'),
+  memberFormName: document.getElementById('memberFormName'),
+  memberFormSaveButton: document.getElementById('memberFormSaveButton'),
+
+  subjectTypeFilter: document.getElementById('subjectTypeFilter'),
+  subjectKeyword: document.getElementById('subjectKeyword'),
+  searchSubjectsButton: document.getElementById('searchSubjectsButton'),
+  reloadSubjectsButton: document.getElementById('reloadSubjectsButton'),
+  openSubjectCreateButton: document.getElementById('openSubjectCreateButton'),
+  subjectCountLabel: document.getElementById('subjectCountLabel'),
+  subjectTableBody: document.getElementById('subjectTableBody'),
+  subjectDetailEmpty: document.getElementById('subjectDetailEmpty'),
+  subjectDetailBody: document.getElementById('subjectDetailBody'),
+  subjectDetailCode: document.getElementById('subjectDetailCode'),
+  subjectDetailName: document.getElementById('subjectDetailName'),
+  subjectDetailType: document.getElementById('subjectDetailType'),
+  subjectDetailSortOrder: document.getElementById('subjectDetailSortOrder'),
+  subjectDetailEnabled: document.getElementById('subjectDetailEnabled'),
+  subjectDetailNote: document.getElementById('subjectDetailNote'),
+  editSubjectButton: document.getElementById('editSubjectButton'),
+  deleteSubjectButton: document.getElementById('deleteSubjectButton'),
+  subjectFormModal: document.getElementById('subjectFormModal'),
+  subjectFormModalTitle: document.getElementById('subjectFormModalTitle'),
+  subjectCodeReadonlyRow: document.getElementById('subjectCodeReadonlyRow'),
+  subjectFormCode: document.getElementById('subjectFormCode'),
+  subjectFormName: document.getElementById('subjectFormName'),
+  subjectFormType: document.getElementById('subjectFormType'),
+  subjectFormSortOrder: document.getElementById('subjectFormSortOrder'),
+  subjectFormNote: document.getElementById('subjectFormNote'),
+  subjectFormEnabled: document.getElementById('subjectFormEnabled'),
+  subjectFormSaveButton: document.getElementById('subjectFormSaveButton'),
 
   travelTransferModal: document.getElementById('travelTransferModal'),
   travelTransferFiscalYear: document.getElementById('travelTransferFiscalYear'),
@@ -272,6 +326,40 @@ function bindEvents() {
   els.incomeFormEvidenceFile.addEventListener('change', onIncomeEvidenceFileChange);
   els.incomeRemoveEvidenceCheckbox.addEventListener('change', renderIncomeFormEvidenceInfo);
 
+
+  els.searchMembersButton.addEventListener('click', function() { loadMemberMaster(); });
+  els.reloadMembersButton.addEventListener('click', function() { loadUsers().then(loadMemberMaster); });
+  els.memberKeyword.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      loadMemberMaster();
+    }
+  });
+  els.openMemberCreateButton.addEventListener('click', openMemberCreateModal);
+  els.editMemberButton.addEventListener('click', function() {
+    if (!state.selectedMember) return;
+    openMemberEditModal(state.selectedMember);
+  });
+  els.deleteMemberButton.addEventListener('click', deleteSelectedMember);
+  els.memberFormSaveButton.addEventListener('click', saveMember);
+
+  els.searchSubjectsButton.addEventListener('click', function() { loadSubjectMaster(); });
+  els.reloadSubjectsButton.addEventListener('click', function() { loadSubjectMaster(); });
+  els.subjectTypeFilter.addEventListener('change', function() { loadSubjectMaster(); });
+  els.subjectKeyword.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      loadSubjectMaster();
+    }
+  });
+  els.openSubjectCreateButton.addEventListener('click', openSubjectCreateModal);
+  els.editSubjectButton.addEventListener('click', function() {
+    if (!state.selectedSubject) return;
+    openSubjectEditModal(state.selectedSubject);
+  });
+  els.deleteSubjectButton.addEventListener('click', deleteSelectedSubject);
+  els.subjectFormSaveButton.addEventListener('click', saveSubject);
+
   els.searchTravelTransferButton.addEventListener('click', function() { loadTravelTransferList(); });
   els.travelTransferKeyword.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
@@ -289,6 +377,8 @@ function bindEvents() {
       if (page === 'expense-form' && !state.expenseForm.voucherNo && state.expenseForm.mode !== 'edit') prepareExpenseForm('create');
       if (page === 'incomes') loadIncomeList();
       if (page === 'income-form' && !state.incomeForm.voucherNo && state.incomeForm.mode !== 'edit') prepareIncomeForm('create');
+      if (page === 'members') loadMemberMaster();
+      if (page === 'subjects') loadSubjectMaster();
     });
   });
 
@@ -484,6 +574,144 @@ async function switchCurrentUser(user) {
   showToast(`現在ユーザーを ${user.name} さんに切り替えました`, 'success');
 }
 
+
+async function loadMemberMaster() {
+  if (!state.currentUser) return showUserSelectScreen();
+  showLoading('部員一覧を読み込んでいます...');
+  try {
+    const keyword = (els.memberKeyword.value || '').trim();
+    const source = state.users.length ? state.users.slice() : (await apiGet('accounting/listMemberMaster', { keyword: keyword })).users || [];
+    const rows = source.filter(function(user) {
+      return !keyword || String(user.name || '').indexOf(keyword) !== -1;
+    }).sort(function(a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''), 'ja');
+    });
+    state.memberRows = rows;
+    renderMemberTable();
+    if (state.selectedMember) {
+      const matched = rows.find(function(row) { return row.name === state.selectedMember.name; });
+      matched ? renderMemberDetail(matched) : clearMemberDetail();
+    } else {
+      clearMemberDetail();
+    }
+  } catch (error) {
+    state.memberRows = [];
+    renderMemberTable();
+    clearMemberDetail();
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function renderMemberTable() {
+  const rows = state.memberRows || [];
+  els.memberCountLabel.textContent = `${rows.length}件`;
+  if (!rows.length) {
+    els.memberTableBody.innerHTML = '<tr><td class="empty-cell">該当する部員がいません。</td></tr>';
+    return;
+  }
+  const selectedName = state.selectedMember ? state.selectedMember.name : '';
+  els.memberTableBody.innerHTML = rows.map(function(row) {
+    const name = row.name || '';
+    const selectedClass = name === selectedName ? ' class="selected-row"' : '';
+    return `<tr${selectedClass}><td><button type="button" class="table-row-button" data-member-name="${escapeHtml(name)}">${escapeHtml(name)}</button></td></tr>`;
+  }).join('');
+  els.memberTableBody.querySelectorAll('[data-member-name]').forEach(function(button) {
+    button.addEventListener('click', function() {
+      const member = rows.find(function(row) { return row.name === button.dataset.memberName; });
+      if (member) renderMemberDetail(member);
+    });
+  });
+}
+
+function clearMemberDetail() {
+  state.selectedMember = null;
+  els.memberDetailEmpty.classList.remove('hidden');
+  els.memberDetailBody.classList.add('hidden');
+  els.memberDetailName.textContent = '-';
+  els.editMemberButton.disabled = true;
+  els.deleteMemberButton.disabled = true;
+}
+
+function renderMemberDetail(member) {
+  state.selectedMember = member;
+  els.memberDetailEmpty.classList.add('hidden');
+  els.memberDetailBody.classList.remove('hidden');
+  els.memberDetailName.textContent = member.name || '-';
+  els.editMemberButton.disabled = false;
+  els.deleteMemberButton.disabled = false;
+  renderMemberTable();
+}
+
+function openMemberCreateModal() {
+  state.memberForm = { mode: 'create', originalName: '' };
+  els.memberFormModalTitle.textContent = '部員登録';
+  els.memberFormName.value = '';
+  openModal('memberFormModal');
+}
+
+function openMemberEditModal(member) {
+  state.memberForm = { mode: 'edit', originalName: member.name || '' };
+  els.memberFormModalTitle.textContent = `部員編集：${member.name || ''}`;
+  els.memberFormName.value = member.name || '';
+  openModal('memberFormModal');
+}
+
+async function saveMember() {
+  if (!state.currentUser) return showToast('利用者を選択してください', 'error');
+  try {
+    const name = requireValue(els.memberFormName.value, '氏名を入力してください').trim();
+    showLoading(state.memberForm.mode === 'edit' ? '部員情報を更新しています...' : '部員を登録しています...');
+    if (state.memberForm.mode === 'edit') {
+      const result = await apiPost('member/updateFromAccounting', {
+        currentUser: state.currentUser,
+        oldName: state.memberForm.originalName,
+        newName: name
+      });
+      if (state.currentUser && state.currentUser.name === state.memberForm.originalName) {
+        saveCurrentUser({ name: result.newName || name });
+      }
+      showToast('部員情報を更新しました', 'success');
+    } else {
+      await apiPost('member/createFromAccounting', {
+        currentUser: state.currentUser,
+        name: name
+      });
+      showToast('部員を登録しました', 'success');
+    }
+    closeModal('memberFormModal');
+    await loadUsers();
+    await loadMemberMaster();
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function deleteSelectedMember() {
+  if (!state.selectedMember) return;
+  const name = state.selectedMember.name || '';
+  if (state.currentUser && state.currentUser.name === name) {
+    showToast('現在ユーザーは削除できません。先に別の利用者へ切り替えてください', 'error');
+    return;
+  }
+  if (!window.confirm(`${name} を削除します。よろしいですか。`)) return;
+  showLoading('部員を削除しています...');
+  try {
+    await apiPost('member/deleteFromAccounting', { currentUser: state.currentUser, name: name });
+    showToast('部員を削除しました', 'success');
+    clearMemberDetail();
+    await loadUsers();
+    await loadMemberMaster();
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
 async function loadSubjects() {
   showLoading('科目一覧を読み込んでいます...');
   try {
@@ -532,6 +760,194 @@ function renderIncomeSubjectOptions(selectedCode) {
   renderSubjectOptions(els.incomeFormSubjectSelect, state.incomeSubjects, selectedCode, 'INC001');
 }
 
+
+async function loadSubjectMaster() {
+  if (!state.currentUser) return showUserSelectScreen();
+  showLoading('科目マスタを読み込んでいます...');
+  try {
+    const result = await apiGet('accounting/listSubjects', {
+      type: els.subjectTypeFilter.value,
+      keyword: (els.subjectKeyword.value || '').trim(),
+      includeDisabled: 'true'
+    });
+    state.subjectMasterRows = (result.subjects || []).slice().sort(function(a, b) {
+      const typeComp = String(a['収支区分'] || '').localeCompare(String(b['収支区分'] || ''), 'ja');
+      if (typeComp !== 0) return typeComp;
+      const orderComp = Number(a['表示順'] || 0) - Number(b['表示順'] || 0);
+      if (orderComp !== 0) return orderComp;
+      return String(a['科目コード'] || '').localeCompare(String(b['科目コード'] || ''), 'ja');
+    });
+    renderSubjectTable();
+    if (state.selectedSubject) {
+      const matched = state.subjectMasterRows.find(function(row) { return row['科目コード'] === state.selectedSubject['科目コード']; });
+      matched ? renderSubjectDetail(matched) : clearSubjectDetail();
+    } else {
+      clearSubjectDetail();
+    }
+  } catch (error) {
+    state.subjectMasterRows = [];
+    renderSubjectTable();
+    clearSubjectDetail();
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function renderSubjectTable() {
+  const rows = state.subjectMasterRows || [];
+  els.subjectCountLabel.textContent = `${rows.length}件`;
+  if (!rows.length) {
+    els.subjectTableBody.innerHTML = '<tr><td colspan="6" class="empty-cell">該当する科目がありません。</td></tr>';
+    return;
+  }
+  const selectedCode = state.selectedSubject ? state.selectedSubject['科目コード'] : '';
+  els.subjectTableBody.innerHTML = rows.map(function(row) {
+    const code = row['科目コード'] || '';
+    const enabled = String(row['使用可否']) !== 'false';
+    const selectedClass = code === selectedCode ? ' class="selected-row"' : '';
+    return `
+      <tr${selectedClass}>
+        <td><button type="button" class="table-row-button" data-subject-code="${escapeHtml(code)}">${escapeHtml(code)}</button></td>
+        <td>${escapeHtml(row['科目名'] || '')}</td>
+        <td>${renderSubjectTypeText(row['収支区分'])}</td>
+        <td class="text-right">${escapeHtml(String(row['表示順'] || 0))}</td>
+        <td>${enabled ? '<span class="badge yes">使用中</span>' : '<span class="badge none">停止</span>'}</td>
+        <td>${escapeHtml(row['備考'] || '')}</td>
+      </tr>
+    `;
+  }).join('');
+  els.subjectTableBody.querySelectorAll('[data-subject-code]').forEach(function(button) {
+    button.addEventListener('click', function() {
+      const row = state.subjectMasterRows.find(function(item) { return item['科目コード'] === button.dataset.subjectCode; });
+      if (row) renderSubjectDetail(row);
+    });
+  });
+}
+
+function renderSubjectTypeText(type) {
+  if (type === '収入') return '<span class="subject-type-income">収入</span>';
+  if (type === '支出') return '<span class="subject-type-expense">支出</span>';
+  return escapeHtml(type || '-');
+}
+
+function clearSubjectDetail() {
+  state.selectedSubject = null;
+  els.subjectDetailEmpty.classList.remove('hidden');
+  els.subjectDetailBody.classList.add('hidden');
+  els.subjectDetailCode.textContent = '-';
+  els.subjectDetailName.textContent = '-';
+  els.subjectDetailType.textContent = '-';
+  els.subjectDetailSortOrder.textContent = '-';
+  els.subjectDetailEnabled.textContent = '-';
+  els.subjectDetailNote.textContent = '-';
+  els.editSubjectButton.disabled = true;
+  els.deleteSubjectButton.disabled = true;
+}
+
+function renderSubjectDetail(subject) {
+  state.selectedSubject = subject;
+  els.subjectDetailEmpty.classList.add('hidden');
+  els.subjectDetailBody.classList.remove('hidden');
+  els.subjectDetailCode.textContent = subject['科目コード'] || '-';
+  els.subjectDetailName.textContent = subject['科目名'] || '-';
+  els.subjectDetailType.textContent = subject['収支区分'] || '-';
+  els.subjectDetailSortOrder.textContent = String(subject['表示順'] || 0);
+  els.subjectDetailEnabled.textContent = String(subject['使用可否']) !== 'false' ? '使用中' : '停止';
+  els.subjectDetailNote.textContent = subject['備考'] || '-';
+  els.editSubjectButton.disabled = false;
+  els.deleteSubjectButton.disabled = false;
+  renderSubjectTable();
+}
+
+function openSubjectCreateModal() {
+  state.subjectForm = { mode: 'create', subjectCode: '' };
+  els.subjectFormModalTitle.textContent = '科目登録';
+  els.subjectFormCode.readOnly = false;
+  els.subjectCodeReadonlyRow.classList.remove('readonly-field');
+  els.subjectFormCode.value = '';
+  els.subjectFormCode.required = true;
+  els.subjectFormName.value = '';
+  els.subjectFormType.value = els.subjectTypeFilter.value || '';
+  els.subjectFormSortOrder.value = '';
+  els.subjectFormNote.value = '';
+  els.subjectFormEnabled.checked = true;
+  openModal('subjectFormModal');
+}
+
+function openSubjectEditModal(subject) {
+  state.subjectForm = { mode: 'edit', subjectCode: subject['科目コード'] || '' };
+  els.subjectFormModalTitle.textContent = `科目編集：${subject['科目コード'] || ''}`;
+  els.subjectFormCode.readOnly = true;
+  els.subjectCodeReadonlyRow.classList.add('readonly-field');
+  els.subjectFormCode.value = subject['科目コード'] || '';
+  els.subjectFormCode.required = false;
+  els.subjectFormName.value = subject['科目名'] || '';
+  els.subjectFormType.value = subject['収支区分'] || '';
+  els.subjectFormSortOrder.value = String(subject['表示順'] || 0);
+  els.subjectFormNote.value = subject['備考'] || '';
+  els.subjectFormEnabled.checked = String(subject['使用可否']) !== 'false';
+  openModal('subjectFormModal');
+}
+
+async function saveSubject() {
+  if (!state.currentUser) return showToast('利用者を選択してください', 'error');
+  try {
+    const subjectCode = requireValue(els.subjectFormCode.value, '科目コードを入力してください').trim();
+    const subjectName = requireValue(els.subjectFormName.value, '科目名を入力してください').trim();
+    const type = requireValue(els.subjectFormType.value, '収支区分を選択してください');
+    const sortOrder = Number(els.subjectFormSortOrder.value || 0);
+    const data = {
+      subjectCode: subjectCode,
+      subjectName: subjectName,
+      type: type,
+      sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
+      enabled: els.subjectFormEnabled.checked,
+      note: els.subjectFormNote.value.trim()
+    };
+    showLoading(state.subjectForm.mode === 'edit' ? '科目を更新しています...' : '科目を登録しています...');
+    if (state.subjectForm.mode === 'edit') {
+      await apiPost('accounting/updateSubject', {
+        currentUser: state.currentUser,
+        subjectCode: state.subjectForm.subjectCode,
+        data: data
+      });
+      showToast('科目を更新しました', 'success');
+    } else {
+      await apiPost('accounting/createSubject', {
+        currentUser: state.currentUser,
+        data: data
+      });
+      showToast('科目を登録しました', 'success');
+    }
+    closeModal('subjectFormModal');
+    await loadSubjects();
+    await loadSubjectMaster();
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function deleteSelectedSubject() {
+  if (!state.selectedSubject) return;
+  const code = state.selectedSubject['科目コード'] || '';
+  if (!window.confirm(`${code} を削除します。よろしいですか。`)) return;
+  showLoading('科目を削除しています...');
+  try {
+    await apiPost('accounting/deleteSubject', { currentUser: state.currentUser, subjectCode: code });
+    showToast('科目を削除しました', 'success');
+    clearSubjectDetail();
+    await loadSubjects();
+    await loadSubjectMaster();
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
 async function loadHomeSummary() {
   if (!state.currentUser) {
     showUserSelectScreen();
@@ -548,14 +964,10 @@ async function loadHomeSummary() {
     const incomeRows = incomeResult.vouchers || [];
     const expenseTotal = expenseRows.reduce(function(sum, row) { return sum + Number(row['支出金額'] || 0); }, 0);
     const incomeTotal = incomeRows.reduce(function(sum, row) { return sum + Number(row['収入金額'] || 0); }, 0);
-    const expenseEvidenceCount = expenseRows.filter(function(row) { return toBoolean(row['証憑有無']); }).length;
-    const incomeEvidenceCount = incomeRows.filter(function(row) { return toBoolean(row['証憑有無']); }).length;
-    els.homeExpenseCount.textContent = String(expenseRows.length);
+    const balanceTotal = incomeTotal - expenseTotal;
     els.homeExpenseTotal.textContent = formatCurrency(expenseTotal);
-    els.homeEvidenceCount.textContent = String(expenseEvidenceCount);
-    els.homeIncomeCount.textContent = String(incomeRows.length);
     els.homeIncomeTotal.textContent = formatCurrency(incomeTotal);
-    els.homeIncomeEvidenceCount.textContent = String(incomeEvidenceCount);
+    els.homeBalanceTotal.textContent = formatCurrency(balanceTotal);
   } catch (error) {
     showToast(error.message, 'error');
   } finally {

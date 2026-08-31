@@ -937,3 +937,51 @@ td {
   border-color: #ef4444;
   box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
 }
+
+
+.one-column-grid {
+  grid-template-columns: 1fr;
+}
+
+.narrow-detail-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.7fr);
+}
+
+.simple-table {
+  min-width: 320px;
+}
+
+.compact-modal-grid {
+  margin-top: 14px;
+}
+
+.single-form-grid {
+  grid-template-columns: 1fr;
+}
+
+.checkbox-panel {
+  min-height: 44px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.modal-footer-actions {
+  margin-top: 18px;
+}
+
+.subject-type-expense {
+  color: #1d4ed8;
+}
+
+.subject-type-income {
+  color: #15803d;
+}
+
+@media (max-width: 1024px) {
+  .narrow-detail-grid,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
