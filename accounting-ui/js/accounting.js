@@ -245,6 +245,7 @@ document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
   bindEvents();
+  bindUnsavedChangeListeners();
   populateFiscalYearOptions();
   restoreCurrentUser();
   await loadUsers();
@@ -274,13 +275,11 @@ function bindEvents() {
   els.refreshHomeButton.addEventListener('click', function() { loadHomeSummary(); });
 
   els.goExpensesButton.addEventListener('click', function() {
-    switchPage('expenses');
-    loadExpenseList();
+    if (switchPage('expenses')) loadExpenseList();
   });
   els.goExpenseCreateButton.addEventListener('click', openExpenseCreateForm);
   els.goIncomesButton.addEventListener('click', function() {
-    switchPage('incomes');
-    loadIncomeList();
+    if (switchPage('incomes')) loadIncomeList();
   });
   els.goIncomeCreateButton.addEventListener('click', openIncomeCreateForm);
   els.openTravelTransferFromHome.addEventListener('click', function() { openTravelTransferModal(); });
@@ -300,8 +299,7 @@ function bindEvents() {
   });
   els.deleteExpenseButton.addEventListener('click', deleteSelectedExpense);
   els.backToExpenseListButton.addEventListener('click', function() {
-    switchPage('expenses');
-    loadExpenseList();
+    if (switchPage('expenses')) loadExpenseList();
   });
   els.resetExpenseFormButton.addEventListener('click', function() {
     if (state.expenseForm.mode === 'edit' && state.selectedExpense && state.selectedExpense.voucher) {
@@ -331,8 +329,7 @@ function bindEvents() {
   });
   els.deleteIncomeButton.addEventListener('click', deleteSelectedIncome);
   els.backToIncomeListButton.addEventListener('click', function() {
-    switchPage('incomes');
-    loadIncomeList();
+    if (switchPage('incomes')) loadIncomeList();
   });
   els.resetIncomeFormButton.addEventListener('click', function() {
     if (state.incomeForm.mode === 'edit' && state.selectedIncome && state.selectedIncome.voucher) {
@@ -382,7 +379,15 @@ function bindEvents() {
   els.subjectFormSaveButton.addEventListener('click', saveSubject);
 
   els.reloadBudgetButton.addEventListener('click', function() { loadBudgetPage(); });
-  els.budgetFiscalYear.addEventListener('change', function() { loadBudgetPage(); });
+  els.budgetFiscalYear.addEventListener('change', function() {
+    const previousValue = els.budgetFiscalYear.dataset.loadedValue || '';
+    if (hasUnsavedChanges('budget') && !window.confirm(UNSAVED_CHANGES_MESSAGE)) {
+      if (previousValue) els.budgetFiscalYear.value = previousValue;
+      return;
+    }
+    clearUnsavedContext('budget');
+    loadBudgetPage({ force: true });
+  });
   els.budgetTypeFilter.addEventListener('change', function() { renderBudgetTable(); });
   els.exportBudgetPdfButton.addEventListener('click', generateBudgetPdf);
   els.saveBudgetButton.addEventListener('click', saveBudgetRows);
@@ -398,7 +403,7 @@ function bindEvents() {
   document.querySelectorAll('.side-nav-button[data-page]').forEach(function(button) {
     button.addEventListener('click', function() {
       const page = button.dataset.page;
-      switchPage(page);
+      if (!switchPage(page)) return;
       if (page === 'home') loadHomeSummary();
       if (page === 'expenses') loadExpenseList();
       if (page === 'expense-form' && !state.expenseForm.voucherNo && state.expenseForm.mode !== 'edit') prepareExpenseForm('create');
@@ -478,17 +483,268 @@ function showAppShell() {
   els.appShell.classList.remove('hidden');
 }
 
-function switchPage(pageName) {
+
+const UNSAVED_CHANGES_MESSAGE = '保存していない内容があります。このまま移動すると入力内容は破棄されます。よろしいですか？';
+const unsavedState = {
+  baselines: {},
+  dirty: {},
+  listenersBound: false
+};
+
+function clonePlain(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function setUnsavedBaseline(context, snapshot) {
+  unsavedState.baselines[context] = snapshot;
+  delete unsavedState.dirty[context];
+}
+
+function updateUnsavedContext(context, snapshot) {
+  if (!(context in unsavedState.baselines)) {
+    setUnsavedBaseline(context, snapshot);
+    return;
+  }
+  if (unsavedState.baselines[context] === snapshot) {
+    delete unsavedState.dirty[context];
+    return;
+  }
+  unsavedState.dirty[context] = true;
+}
+
+function clearUnsavedContext(context) {
+  delete unsavedState.baselines[context];
+  delete unsavedState.dirty[context];
+}
+
+function hasUnsavedChanges(context) {
+  if (context) return !!unsavedState.dirty[context];
+  return Object.keys(unsavedState.dirty).some(function(key) { return !!unsavedState.dirty[key]; });
+}
+
+function confirmDiscardUnsavedChanges() {
+  if (!hasUnsavedChanges()) return true;
+  return window.confirm(UNSAVED_CHANGES_MESSAGE);
+}
+
+function getCurrentPageName() {
+  const active = document.querySelector('.page-section.active');
+  return active ? String(active.id || '').replace(/^page-/, '') : '';
+}
+
+function getUnsavedContextForPage(pageName) {
+  if (pageName === 'expense-form') return 'expenseForm';
+  if (pageName === 'income-form') return 'incomeForm';
+  if (pageName === 'budget') return 'budget';
+  return '';
+}
+
+function getUnsavedContextForModal(modalId) {
+  if (modalId === 'memberFormModal') return 'memberForm';
+  if (modalId === 'subjectFormModal') return 'subjectForm';
+  return '';
+}
+
+function getOpenDirtyModalId() {
+  if (els.memberFormModal && !els.memberFormModal.classList.contains('hidden') && hasUnsavedChanges('memberForm')) return 'memberFormModal';
+  if (els.subjectFormModal && !els.subjectFormModal.classList.contains('hidden') && hasUnsavedChanges('subjectForm')) return 'subjectFormModal';
+  return '';
+}
+
+function getExpenseFormSnapshot() {
+  return JSON.stringify({
+    mode: state.expenseForm.mode,
+    voucherNo: state.expenseForm.voucherNo,
+    fiscalYear: els.formFiscalYear.value,
+    expenseDate: els.formExpenseDate.value,
+    subjectCode: els.formSubjectSelect.value,
+    summary: els.formSummary.value,
+    payee: els.formPayee.value,
+    amount: els.formAmount.value,
+    travelControlNo: els.formRelatedTravelControlNo.value,
+    note: els.formNote.value,
+    removeEvidence: els.removeEvidenceCheckbox.checked,
+    pendingEvidenceName: state.expenseForm.pendingEvidenceFile ? state.expenseForm.pendingEvidenceFile.name : '',
+    pendingEvidenceSize: state.expenseForm.pendingEvidenceFile ? state.expenseForm.pendingEvidenceFile.size : 0,
+    existingEvidenceId: state.expenseForm.existingEvidence ? (state.expenseForm.existingEvidence['DriveFileId'] || state.expenseForm.existingEvidence['DriveUrl'] || '') : ''
+  });
+}
+
+function getIncomeFormSnapshot() {
+  return JSON.stringify({
+    mode: state.incomeForm.mode,
+    voucherNo: state.incomeForm.voucherNo,
+    fiscalYear: els.incomeFormFiscalYear.value,
+    incomeDate: els.incomeFormDate.value,
+    subjectCode: els.incomeFormSubjectSelect.value,
+    summary: els.incomeFormSummary.value,
+    payer: els.incomeFormPayer.value,
+    amount: els.incomeFormAmount.value,
+    note: els.incomeFormNote.value,
+    removeEvidence: els.incomeRemoveEvidenceCheckbox.checked,
+    pendingEvidenceName: state.incomeForm.pendingEvidenceFile ? state.incomeForm.pendingEvidenceFile.name : '',
+    pendingEvidenceSize: state.incomeForm.pendingEvidenceFile ? state.incomeForm.pendingEvidenceFile.size : 0,
+    existingEvidenceId: state.incomeForm.existingEvidence ? (state.incomeForm.existingEvidence['DriveFileId'] || state.incomeForm.existingEvidence['DriveUrl'] || '') : ''
+  });
+}
+
+function getMemberFormSnapshot() {
+  return JSON.stringify({
+    mode: state.memberForm.mode,
+    originalName: state.memberForm.originalName || '',
+    name: els.memberFormName.value
+  });
+}
+
+function getSubjectFormSnapshot() {
+  return JSON.stringify({
+    mode: state.subjectForm.mode,
+    subjectCode: state.subjectForm.subjectCode || '',
+    codeValue: els.subjectFormCode.value,
+    name: els.subjectFormName.value,
+    type: els.subjectFormType.value,
+    sortOrder: els.subjectFormSortOrder.value,
+    note: els.subjectFormNote.value,
+    enabled: els.subjectFormEnabled.checked
+  });
+}
+
+function getBudgetSnapshot() {
+  return JSON.stringify({
+    fiscalYear: els.budgetFiscalYear.value,
+    rows: (state.budgetRows || []).map(function(row) {
+      return {
+        type: row.type || '',
+        subjectCode: row.subjectCode || '',
+        initialBudget: Number(row.initialBudget || 0),
+        note: row.note || ''
+      };
+    })
+  });
+}
+
+function discardUnsavedChangesForContext(context) {
+  if (context === 'expenseForm') {
+    prepareExpenseForm(state.expenseForm.mode || 'create', clonePlain(state.expenseForm.initialSource) || {});
+    return;
+  }
+  if (context === 'incomeForm') {
+    prepareIncomeForm(state.incomeForm.mode || 'create', clonePlain(state.incomeForm.initialSource) || {});
+    return;
+  }
+  if (context === 'memberForm') {
+    if ((state.memberForm.mode || 'create') === 'edit') {
+      openMemberEditModal(clonePlain(state.memberForm.initialMember) || { name: state.memberForm.originalName || '' });
+    } else {
+      openMemberCreateModal();
+    }
+    return;
+  }
+  if (context === 'subjectForm') {
+    if ((state.subjectForm.mode || 'create') === 'edit') {
+      openSubjectEditModal(clonePlain(state.subjectForm.initialSubject) || {});
+    } else {
+      openSubjectCreateModal();
+    }
+    return;
+  }
+  if (context === 'budget') {
+    state.budgetRows = clonePlain(state.budgetInitialRows) || [];
+    state.budgetPreviousSummary = clonePlain(state.budgetInitialSummary) || { incomeTotal: 0, expenseTotal: 0, balance: 0 };
+    renderBudgetTable();
+    setUnsavedBaseline('budget', getBudgetSnapshot());
+  }
+}
+
+function discardAllUnsavedChanges() {
+  ['memberForm', 'subjectForm', 'expenseForm', 'incomeForm', 'budget'].forEach(function(context) {
+    if (!hasUnsavedChanges(context)) return;
+    discardUnsavedChangesForContext(context);
+    clearUnsavedContext(context);
+  });
+}
+
+function bindUnsavedChangeListeners() {
+  if (unsavedState.listenersBound) return;
+  unsavedState.listenersBound = true;
+
+  [
+    els.formFiscalYear, els.formExpenseDate, els.formSubjectSelect, els.formSummary, els.formPayee,
+    els.formAmount, els.formRelatedTravelControlNo, els.formNote, els.formEvidenceFile, els.removeEvidenceCheckbox
+  ].forEach(function(el) {
+    if (!el) return;
+    ['input', 'change'].forEach(function(eventName) {
+      el.addEventListener(eventName, function() { updateUnsavedContext('expenseForm', getExpenseFormSnapshot()); });
+    });
+  });
+
+  [
+    els.incomeFormFiscalYear, els.incomeFormDate, els.incomeFormSubjectSelect, els.incomeFormSummary,
+    els.incomeFormPayer, els.incomeFormAmount, els.incomeFormNote, els.incomeFormEvidenceFile, els.incomeRemoveEvidenceCheckbox
+  ].forEach(function(el) {
+    if (!el) return;
+    ['input', 'change'].forEach(function(eventName) {
+      el.addEventListener(eventName, function() { updateUnsavedContext('incomeForm', getIncomeFormSnapshot()); });
+    });
+  });
+
+  [els.memberFormName].forEach(function(el) {
+    if (!el) return;
+    ['input', 'change'].forEach(function(eventName) {
+      el.addEventListener(eventName, function() { updateUnsavedContext('memberForm', getMemberFormSnapshot()); });
+    });
+  });
+
+  [els.subjectFormCode, els.subjectFormName, els.subjectFormType, els.subjectFormSortOrder, els.subjectFormNote, els.subjectFormEnabled].forEach(function(el) {
+    if (!el) return;
+    ['input', 'change'].forEach(function(eventName) {
+      el.addEventListener(eventName, function() { updateUnsavedContext('subjectForm', getSubjectFormSnapshot()); });
+    });
+  });
+
+  window.addEventListener('beforeunload', function(event) {
+    if (!hasUnsavedChanges()) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+}
+
+function switchPage(pageName, options) {
+  const opts = options || {};
+  const currentPage = getCurrentPageName();
+  if (!opts.force) {
+    const modalId = getOpenDirtyModalId();
+    if (modalId) {
+      if (!confirmDiscardUnsavedChanges()) return false;
+      closeModal(modalId, { force: true });
+    }
+    const currentContext = getUnsavedContextForPage(currentPage);
+    if (currentPage && currentPage !== pageName && currentContext && hasUnsavedChanges(currentContext)) {
+      if (!confirmDiscardUnsavedChanges()) return false;
+      discardUnsavedChangesForContext(currentContext);
+      clearUnsavedContext(currentContext);
+    }
+  }
   document.querySelectorAll('.page-section').forEach(function(section) {
     section.classList.toggle('active', section.id === `page-${pageName}`);
   });
   document.querySelectorAll('.side-nav-button[data-page]').forEach(function(button) {
     button.classList.toggle('active', button.dataset.page === pageName);
   });
+  return true;
 }
 
 function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function closeModal(id, options) {
+  const opts = options || {};
+  const context = getUnsavedContextForModal(id);
+  if (!opts.force && context && hasUnsavedChanges(context)) {
+    if (!confirmDiscardUnsavedChanges()) return false;
+  }
+  if (context) clearUnsavedContext(context);
+  document.getElementById(id).classList.add('hidden');
+  return true;
+}
 
 function openSwitchUserModal() {
   openModal('switchUserModal');
@@ -586,6 +842,8 @@ function renderUserList(container, users, keyword, onSelect) {
 }
 
 async function selectUserAndEnter(user) {
+  if (hasUnsavedChanges() && !window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+  discardAllUnsavedChanges();
   saveCurrentUser(user);
   showAppShell();
   await loadSubjects();
@@ -597,6 +855,8 @@ async function selectUserAndEnter(user) {
 }
 
 async function switchCurrentUser(user) {
+  if (hasUnsavedChanges() && !window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+  discardAllUnsavedChanges();
   saveCurrentUser(user);
   closeModal('switchUserModal');
   showToast(`現在ユーザーを ${user.name} さんに切り替えました`, 'success');
@@ -673,17 +933,19 @@ function renderMemberDetail(member) {
 }
 
 function openMemberCreateModal() {
-  state.memberForm = { mode: 'create', originalName: '' };
+  state.memberForm = { mode: 'create', originalName: '', initialMember: null };
   els.memberFormModalTitle.textContent = '部員登録';
   els.memberFormName.value = '';
   openModal('memberFormModal');
+  setUnsavedBaseline('memberForm', getMemberFormSnapshot());
 }
 
 function openMemberEditModal(member) {
-  state.memberForm = { mode: 'edit', originalName: member.name || '' };
+  state.memberForm = { mode: 'edit', originalName: member.name || '', initialMember: clonePlain(member) || null };
   els.memberFormModalTitle.textContent = `部員編集：${member.name || ''}`;
   els.memberFormName.value = member.name || '';
   openModal('memberFormModal');
+  setUnsavedBaseline('memberForm', getMemberFormSnapshot());
 }
 
 async function saveMember() {
@@ -708,7 +970,8 @@ async function saveMember() {
       });
       showToast('部員を登録しました', 'success');
     }
-    closeModal('memberFormModal');
+    clearUnsavedContext('memberForm');
+    closeModal('memberFormModal', { force: true });
     await loadUsers();
     await loadMemberMaster();
   } catch (error) {
@@ -889,7 +1152,7 @@ function renderSubjectDetail(subject) {
 }
 
 function openSubjectCreateModal() {
-  state.subjectForm = { mode: 'create', subjectCode: '' };
+  state.subjectForm = { mode: 'create', subjectCode: '', initialSubject: null };
   els.subjectFormModalTitle.textContent = '科目登録';
   els.subjectFormCode.readOnly = false;
   els.subjectCodeReadonlyRow.classList.remove('readonly-field');
@@ -901,10 +1164,11 @@ function openSubjectCreateModal() {
   els.subjectFormNote.value = '';
   els.subjectFormEnabled.checked = true;
   openModal('subjectFormModal');
+  setUnsavedBaseline('subjectForm', getSubjectFormSnapshot());
 }
 
 function openSubjectEditModal(subject) {
-  state.subjectForm = { mode: 'edit', subjectCode: subject['科目コード'] || '' };
+  state.subjectForm = { mode: 'edit', subjectCode: subject['科目コード'] || '', initialSubject: clonePlain(subject) || null };
   els.subjectFormModalTitle.textContent = `科目編集：${subject['科目コード'] || ''}`;
   els.subjectFormCode.readOnly = true;
   els.subjectCodeReadonlyRow.classList.add('readonly-field');
@@ -916,6 +1180,7 @@ function openSubjectEditModal(subject) {
   els.subjectFormNote.value = subject['備考'] || '';
   els.subjectFormEnabled.checked = String(subject['使用可否']) !== 'false';
   openModal('subjectFormModal');
+  setUnsavedBaseline('subjectForm', getSubjectFormSnapshot());
 }
 
 async function saveSubject() {
@@ -948,7 +1213,8 @@ async function saveSubject() {
       });
       showToast('科目を登録しました', 'success');
     }
-    closeModal('subjectFormModal');
+    clearUnsavedContext('subjectForm');
+    closeModal('subjectFormModal', { force: true });
     await loadSubjects();
     await loadSubjectMaster();
   } catch (error) {
@@ -1111,6 +1377,7 @@ function openExpenseEditForm(voucher, evidence) {
 
 function prepareExpenseForm(mode, options) {
   const source = options || {};
+  state.expenseForm.initialSource = clonePlain(source || {});
   state.expenseForm.mode = mode;
   state.expenseForm.voucherNo = '';
   state.expenseForm.existingEvidence = null;
@@ -1135,6 +1402,7 @@ function prepareExpenseForm(mode, options) {
     els.formNote.value = voucher['備考'] || '';
     els.removeEvidenceRow.classList.remove('hidden');
     renderExpenseFormEvidenceInfo();
+    setUnsavedBaseline('expenseForm', getExpenseFormSnapshot());
     return;
   }
 
@@ -1152,6 +1420,7 @@ function prepareExpenseForm(mode, options) {
   els.formNote.value = travel ? `旅費申請 ${travel.controlNo || ''} から転記` : '';
   els.removeEvidenceRow.classList.add('hidden');
   renderExpenseFormEvidenceInfo();
+  setUnsavedBaseline('expenseForm', getExpenseFormSnapshot());
 }
 
 function renderExpenseFormEvidenceInfo() {
@@ -1195,6 +1464,7 @@ async function saveExpense(openListAfterSave) {
     if (state.expenseForm.mode === 'edit') payload.voucherNo = state.expenseForm.voucherNo;
     await applyEvidencePayloadForSave(payload, state.expenseForm, els.removeEvidenceCheckbox.checked);
     const result = await apiPost(state.expenseForm.mode === 'edit' ? 'accounting/updateExpenseVoucher' : 'accounting/createExpenseVoucher', payload);
+    clearUnsavedContext('expenseForm');
     const savedVoucherNo = result.voucherNo || payload.voucherNo;
     showToast(state.expenseForm.mode === 'edit' ? '支出伝票を更新しました' : '支出伝票を登録しました', 'success');
     await loadHomeSummary();
@@ -1347,6 +1617,7 @@ function openIncomeEditForm(voucher, evidence) {
 
 function prepareIncomeForm(mode, options) {
   const source = options || {};
+  state.incomeForm.initialSource = clonePlain(source || {});
   state.incomeForm.mode = mode;
   state.incomeForm.voucherNo = '';
   state.incomeForm.existingEvidence = null;
@@ -1369,6 +1640,7 @@ function prepareIncomeForm(mode, options) {
     els.incomeFormNote.value = voucher['備考'] || '';
     els.incomeRemoveEvidenceRow.classList.remove('hidden');
     renderIncomeFormEvidenceInfo();
+    setUnsavedBaseline('incomeForm', getIncomeFormSnapshot());
     return;
   }
 
@@ -1383,6 +1655,7 @@ function prepareIncomeForm(mode, options) {
   els.incomeFormNote.value = '';
   els.incomeRemoveEvidenceRow.classList.add('hidden');
   renderIncomeFormEvidenceInfo();
+  setUnsavedBaseline('incomeForm', getIncomeFormSnapshot());
 }
 
 function renderIncomeFormEvidenceInfo() {
@@ -1425,6 +1698,7 @@ async function saveIncome(openListAfterSave) {
     if (state.incomeForm.mode === 'edit') payload.voucherNo = state.incomeForm.voucherNo;
     await applyEvidencePayloadForSave(payload, state.incomeForm, els.incomeRemoveEvidenceCheckbox.checked);
     const result = await apiPost(state.incomeForm.mode === 'edit' ? 'accounting/updateIncomeVoucher' : 'accounting/createIncomeVoucher', payload);
+    clearUnsavedContext('incomeForm');
     const savedVoucherNo = result.voucherNo || payload.voucherNo;
     showToast(state.incomeForm.mode === 'edit' ? '収入伝票を更新しました' : '収入伝票を登録しました', 'success');
     await loadHomeSummary();
@@ -1524,6 +1798,7 @@ function renderTravelTransferTable() {
 }
 
 async function applyTravelTransfer(controlNo) {
+  if (hasUnsavedChanges('expenseForm') && !window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
   showLoading('旅費申請の内容を取り込んでいます...');
   try {
     const duplicate = await apiGet('accounting/checkTravelTransferDuplicate', { controlNo: controlNo });
@@ -1699,8 +1974,13 @@ async function generateBudgetPdf() {
 }
 
 
-async function loadBudgetPage() {
+async function loadBudgetPage(options) {
+  const opts = options || {};
   if (!state.currentUser) return showUserSelectScreen();
+  if (!opts.force && getCurrentPageName() === 'budget' && hasUnsavedChanges('budget')) {
+    if (!window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+    clearUnsavedContext('budget');
+  }
   clearBudgetPdfResult();
   showLoading('予算書を読み込んでいます...');
   try {
@@ -1847,7 +2127,11 @@ async function loadBudgetPage() {
       balance: previousIncomeTotal - previousExpenseTotal
     };
 
+    els.budgetFiscalYear.dataset.loadedValue = String(fiscalYear);
+    state.budgetInitialRows = clonePlain(state.budgetRows) || [];
+    state.budgetInitialSummary = clonePlain(state.budgetPreviousSummary) || { incomeTotal: 0, expenseTotal: 0, balance: 0 };
     renderBudgetTable();
+    setUnsavedBaseline('budget', getBudgetSnapshot());
   } catch (error) {
     state.budgetRows = [];
     state.budgetPreviousSummary = { incomeTotal: 0, expenseTotal: 0, balance: 0 };
@@ -1899,6 +2183,7 @@ function renderBudgetTable() {
       } else {
         target[field] = Number(input.value || 0);
       }
+      updateUnsavedContext('budget', getBudgetSnapshot());
     });
   });
   updateBudgetSummary();
@@ -1932,6 +2217,7 @@ async function saveBudgetRows() {
       fiscalYear: Number(fiscalYear),
       rows: rows
     });
+    clearUnsavedContext('budget');
     showToast('予算書を保存しました', 'success');
     await loadBudgetPage();
   } catch (error) {
