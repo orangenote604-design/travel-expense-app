@@ -1,5 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('memberAddForm').addEventListener('submit', submitMember);
+  initUnsavedChangesGuard({ formSelector: '#memberAddForm' });
+  refreshUnsavedChangesBaseline();
 });
 
 async function submitMember(event) {
@@ -19,6 +21,7 @@ async function submitMember(event) {
     }
     setMessage(`登録しました: ${result.name}`, 'success');
     document.getElementById('memberAddForm').reset();
+    refreshUnsavedChangesBaseline();
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
     console.error(error);

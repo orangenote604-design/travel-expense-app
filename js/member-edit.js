@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('memberEditForm').addEventListener('submit', updateMember);
   document.getElementById('deleteButton').addEventListener('click', deleteMember);
   initPage();
+  initUnsavedChangesGuard({ formSelector: '#memberEditForm' });
+  refreshUnsavedChangesBaseline();
 });
 
 function initPage() {
@@ -30,6 +32,7 @@ async function updateMember(event) {
     setMessage(`更新しました: ${result.oldName} → ${result.newName}`, 'success');
     document.getElementById('currentName').value = result.newName;
     history.replaceState(null, '', `member-edit.html?name=${encodeURIComponent(result.newName)}`);
+    refreshUnsavedChangesBaseline();
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
     console.error(error);
@@ -53,6 +56,7 @@ async function deleteMember() {
       setMessage(result.error || '削除に失敗しました。', 'error');
       return;
     }
+    disableUnsavedChangesGuard();
     location.href = 'members.html';
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');

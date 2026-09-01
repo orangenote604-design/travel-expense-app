@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindEvents();
     await loadInitialData();
     await initForm();
+    initUnsavedChangesGuard({ formSelector: '#travelForm' });
+    refreshUnsavedChangesBaseline();
   } finally {
     setLoading(false);
   }
@@ -23,7 +25,10 @@ function bindEvents() {
   document.getElementById('otherDetail').addEventListener('input', updatePaymentAmount);
   document.getElementById('driverAllowance').addEventListener('input', updatePaymentAmount);
   document.getElementById('gasolineFee').addEventListener('input', updatePaymentAmount);
-  document.getElementById('clearButton').addEventListener('click', resetNewForm);
+  document.getElementById('clearButton').addEventListener('click', () => {
+    if (hasUnsavedChanges() && !confirmDiscardUnsavedChanges()) return;
+    resetNewForm();
+  });
   document.getElementById('travelForm').addEventListener('submit', submitForm);
 }
 
@@ -71,6 +76,7 @@ function resetNewForm() {
   document.getElementById('paidFlag').checked = false;
   fillTripFields(null);
   handleOtherFeeChange();
+  refreshUnsavedChangesBaseline();
 }
 
 async function loadRecord(controlNo) {
@@ -117,6 +123,7 @@ async function loadRecord(controlNo) {
     }
 
     handleOtherFeeChange();
+    refreshUnsavedChangesBaseline();
   } catch (error) {
     setMessage('申請データの取得に失敗しました。', 'error');
     console.error(error);
@@ -249,14 +256,23 @@ async function submitForm(event) {
     }
 
     if (!editMode) {
+      disableUnsavedChangesGuard();
       location.href = `list.html?created=${encodeURIComponent(result.controlNo)}`;
       return;
     }
 
+    currentControlNo = result.controlNo || currentControlNo;
     document.getElementById('controlNo').value = result.controlNo;
     document.getElementById('fiscalYear').value = result.fiscalYear;
     document.getElementById('roundTripDistance').value = result.roundTripDistance;
     document.getElementById('paymentAmount').value = result.paymentAmount;
+    currentRecordSnapshot = Object.assign({}, payload, {
+      controlNo: currentControlNo,
+      fiscalYear: result.fiscalYear,
+      roundTripDistance: result.roundTripDistance,
+      paymentAmount: result.paymentAmount
+    });
+    refreshUnsavedChangesBaseline();
     setMessage(`更新しました。管理番号: ${result.controlNo}`, 'success');
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');

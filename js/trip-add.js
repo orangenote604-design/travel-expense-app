@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('returnDistance').addEventListener('input', updateRoundTripDistance);
   document.getElementById('separateReturn').addEventListener('change', updateRoundTripDistance);
   updateRoundTripDistance();
+  initUnsavedChangesGuard({ formSelector: '#tripAddForm' });
+  refreshUnsavedChangesBaseline();
 });
 
 function updateRoundTripDistance() {
@@ -42,6 +44,7 @@ async function submitTrip(event) {
     setMessage(`登録しました: ${result.tripName}`, 'success');
     document.getElementById('tripAddForm').reset();
     updateRoundTripDistance();
+    refreshUnsavedChangesBaseline();
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
     console.error(error);

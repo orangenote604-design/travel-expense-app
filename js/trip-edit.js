@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('returnDistance').addEventListener('input', updateRoundTripDistance);
   document.getElementById('separateReturn').addEventListener('change', updateRoundTripDistance);
   await initPage();
+  initUnsavedChangesGuard({ formSelector: '#tripEditForm' });
+  refreshUnsavedChangesBaseline();
 });
 
 async function initPage() {
@@ -31,6 +33,7 @@ async function initPage() {
     document.getElementById('separateReturn').checked = !!trip.separateReturn;
     document.getElementById('returnDistance').value = toNumber(trip.returnDistance);
     updateRoundTripDistance();
+    refreshUnsavedChangesBaseline();
   } catch (error) {
     setMessage('旅行データの取得に失敗しました。', 'error');
     console.error(error);
@@ -74,6 +77,7 @@ async function updateTrip(event) {
     setMessage(`更新しました: ${result.oldTripName} → ${result.tripName}`, 'success');
     document.getElementById('currentTripName').value = result.tripName;
     history.replaceState(null, '', `trip-edit.html?tripName=${encodeURIComponent(result.tripName)}`);
+    refreshUnsavedChangesBaseline();
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
     console.error(error);
@@ -97,6 +101,7 @@ async function deleteTrip() {
       setMessage(result.error || '削除に失敗しました。', 'error');
       return;
     }
+    disableUnsavedChangesGuard();
     location.href = 'trips.html';
   } catch (error) {
     setMessage('通信エラーが発生しました。', 'error');
