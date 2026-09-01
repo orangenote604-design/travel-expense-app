@@ -305,6 +305,14 @@
               <p class="page-description">会計システムで利用する部員マスタを確認・追加・編集・削除できます。ここで変更した内容は利用者選択にも反映されます。</p>
             </div>
             <div class="page-actions wrap-actions">
+              <label class="field compact-field">
+                <span>並び順</span>
+                <select id="memberSortOrder">
+                  <option value="sheet">登録順</option>
+                  <option value="nameAsc">氏名昇順</option>
+                  <option value="nameDesc">氏名降順</option>
+                </select>
+              </label>
               <label class="field compact-field grow-field">
                 <span>氏名検索</span>
                 <input type="text" id="memberKeyword" placeholder="氏名で絞り込み" />

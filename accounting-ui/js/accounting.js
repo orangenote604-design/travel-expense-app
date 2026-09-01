@@ -177,6 +177,7 @@ const els = {
   saveIncomeButtonBottom: document.getElementById('saveIncomeButtonBottom'),
 
 
+  memberSortOrder: document.getElementById('memberSortOrder'),
   memberKeyword: document.getElementById('memberKeyword'),
   searchMembersButton: document.getElementById('searchMembersButton'),
   reloadMembersButton: document.getElementById('reloadMembersButton'),
@@ -347,6 +348,7 @@ function bindEvents() {
 
   els.searchMembersButton.addEventListener('click', function() { loadMemberMaster(); });
   els.reloadMembersButton.addEventListener('click', function() { loadUsers().then(loadMemberMaster); });
+  els.memberSortOrder.addEventListener('change', renderMemberTable);
   els.memberKeyword.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -869,10 +871,10 @@ async function loadMemberMaster() {
   try {
     const keyword = (els.memberKeyword.value || '').trim();
     const source = state.users.length ? state.users.slice() : (await apiGet('accounting/listMemberMaster', { keyword: keyword })).users || [];
-    const rows = source.filter(function(user) {
+    const rows = source.map(function(user, index) {
+      return Object.assign({}, user, { __sheetOrder: index + 1 });
+    }).filter(function(user) {
       return !keyword || String(user.name || '').indexOf(keyword) !== -1;
-    }).sort(function(a, b) {
-      return String(a.name || '').localeCompare(String(b.name || ''), 'ja');
     });
     state.memberRows = rows;
     renderMemberTable();
@@ -892,8 +894,29 @@ async function loadMemberMaster() {
   }
 }
 
+function getSortedMemberRows() {
+  const rows = (state.memberRows || []).slice();
+  const sortOrder = els.memberSortOrder ? els.memberSortOrder.value : 'sheet';
+  if (sortOrder === 'nameAsc') {
+    rows.sort(function(a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''), 'ja');
+    });
+    return rows;
+  }
+  if (sortOrder === 'nameDesc') {
+    rows.sort(function(a, b) {
+      return String(b.name || '').localeCompare(String(a.name || ''), 'ja');
+    });
+    return rows;
+  }
+  rows.sort(function(a, b) {
+    return Number(a.__sheetOrder || 0) - Number(b.__sheetOrder || 0);
+  });
+  return rows;
+}
+
 function renderMemberTable() {
-  const rows = state.memberRows || [];
+  const rows = getSortedMemberRows();
   els.memberCountLabel.textContent = `${rows.length}件`;
   if (!rows.length) {
     els.memberTableBody.innerHTML = '<tr><td class="empty-cell">該当する部員がいません。</td></tr>';
