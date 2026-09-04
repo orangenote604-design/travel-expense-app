@@ -2490,3 +2490,1130 @@ function escapeHtml(value) {
 }
 
 function escapeAttribute(value) { return escapeHtml(value); }
+
+
+/* === Fiscal year / settlement enhancement override block === */
+storageKeys.currentFiscalYear = 'accountingCurrentFiscalYear';
+state.currentFiscalYear = state.currentFiscalYear || null;
+state.settlementRows = state.settlementRows || [];
+state.settlementPdfBlobUrl = state.settlementPdfBlobUrl || '';
+
+function cacheEnhancedEls_() {
+  Object.assign(els, {
+    startupFiscalYear: document.getElementById('startupFiscalYear'),
+    startupYearStatus: document.getElementById('startupYearStatus'),
+    currentFiscalYearLabel: document.getElementById('currentFiscalYearLabel'),
+    switchFiscalYearButton: document.getElementById('switchFiscalYearButton'),
+    subjectFiscalYear: document.getElementById('subjectFiscalYear'),
+    settlementFiscalYear: document.getElementById('settlementFiscalYear'),
+    refreshSettlementButton: document.getElementById('refreshSettlementButton'),
+    exportSettlementPdfButton: document.getElementById('exportSettlementPdfButton'),
+    settlementIncomeTotal: document.getElementById('settlementIncomeTotal'),
+    settlementExpenseTotal: document.getElementById('settlementExpenseTotal'),
+    settlementBalanceTotal: document.getElementById('settlementBalanceTotal'),
+    settlementCountLabel: document.getElementById('settlementCountLabel'),
+    settlementTableBody: document.getElementById('settlementTableBody'),
+    settlementPdfResult: document.getElementById('settlementPdfResult'),
+    switchYearModal: document.getElementById('switchYearModal'),
+    switchYearList: document.getElementById('switchYearList')
+  });
+}
+
+function ensureEnhancedLayout_() {
+  ensureStartupFiscalYearUi_();
+  ensureHeaderFiscalYearUi_();
+  ensureSettlementNav_();
+  ensureSubjectsFiscalYearUi_();
+  ensureSettlementPage_();
+  ensureSwitchYearModal_();
+  cacheEnhancedEls_();
+}
+
+function ensureStartupFiscalYearUi_() {
+  const card = document.querySelector('#userSelectScreen .startup-card');
+  if (!card || document.getElementById('startupFiscalYear')) return;
+  const statusHtml = '<div id="startupYearStatus" class="fiscal-year-badge fiscal-status-current">年度未選択</div>';
+  const toolbar = card.querySelector('.user-select-toolbar');
+  const html = `
+    <div class="year-entry-row">
+      <label class="field compact-field required-field">
+        <span>開始年度</span>
+        <select id="startupFiscalYear" required></select>
+      </label>
+      <div>${statusHtml}</div>
+    </div>
+    <div class="inline-note year-help-note">宍粟市野球部の年度は 10月開始 / 9月終了です。例：2026年10月〜2027年9月は 2026年度（令和8年度）として扱います。</div>
+  `;
+  toolbar.insertAdjacentHTML('afterend', html);
+}
+
+function ensureHeaderFiscalYearUi_() {
+  const headerActions = document.querySelector('.header-actions');
+  if (!headerActions || document.getElementById('currentFiscalYearLabel')) return;
+  const currentUserBox = headerActions.querySelector('.current-user-box');
+  if (currentUserBox) {
+    currentUserBox.insertAdjacentHTML('afterend', `
+      <div class="current-user-box fiscal-year-box">
+        <span class="label">現在年度</span>
+        <strong id="currentFiscalYearLabel" class="fiscal-year-badge fiscal-status-current">-</strong>
+      </div>
+    `);
+  }
+  const switchUserButton = document.getElementById('switchUserButton');
+  if (switchUserButton && !document.getElementById('switchFiscalYearButton')) {
+    switchUserButton.insertAdjacentHTML('afterend', '<button id="switchFiscalYearButton" class="button secondary" type="button">年度切替</button>');
+  }
+}
+
+function ensureSettlementNav_() {
+  const nav = document.querySelector('.side-nav');
+  if (!nav || nav.querySelector('[data-page="settlement"]')) return;
+  const budgetButton = nav.querySelector('[data-page="budget"]');
+  const html = '<button class="side-nav-button" data-page="settlement" type="button">決算書</button>';
+  if (budgetButton) {
+    budgetButton.insertAdjacentHTML('afterend', html);
+  } else {
+    nav.insertAdjacentHTML('beforeend', html);
+  }
+}
+
+function ensureSubjectsFiscalYearUi_() {
+  const actions = document.querySelector('#page-subjects .page-actions');
+  if (!actions || document.getElementById('subjectFiscalYear')) return;
+  const first = actions.querySelector('.field');
+  const html = `
+    <label class="field compact-field required-field">
+      <span>対象年度</span>
+      <select id="subjectFiscalYear" required></select>
+    </label>
+  `;
+  if (first) first.insertAdjacentHTML('beforebegin', html);
+  const desc = document.querySelector('#page-subjects .page-description');
+  if (desc && !document.querySelector('.subject-page-note')) {
+    desc.insertAdjacentHTML('afterend', '<div class="inline-note subject-page-note">科目マスタは共通管理しつつ、年度ごとに使用可否・表示順・備考を切り替えます。</div>');
+  }
+}
+
+function ensureSettlementPage_() {
+  const contentArea = document.querySelector('.content-area');
+  if (!contentArea || document.getElementById('page-settlement')) return;
+  const budgetSection = document.getElementById('page-budget');
+  const html = `
+    <section id="page-settlement" class="page-section">
+      <div class="page-head">
+        <div>
+          <h2 class="page-title">決算書</h2>
+          <p class="page-description">年度ごとの収支実績を科目別に確認し、最終PDFを出力します。</p>
+          <div class="inline-note settlement-note">PDFはご提示いただいた一般会計決算書レイアウトに寄せて、収入の部 / 支出の部 / 差引額を出力します。</div>
+        </div>
+        <div class="page-actions wrap-actions">
+          <label class="field compact-field required-field">
+            <span>年度</span>
+            <select id="settlementFiscalYear" required></select>
+          </label>
+          <button id="refreshSettlementButton" class="button secondary" type="button">更新</button>
+          <button id="exportSettlementPdfButton" class="button primary" type="button">PDF出力</button>
+        </div>
+      </div>
+
+      <div class="summary-grid">
+        <article class="summary-card settlement-income">
+          <div class="summary-label">収入合計</div>
+          <div id="settlementIncomeTotal" class="summary-value">0 円</div>
+        </article>
+        <article class="summary-card settlement-expense">
+          <div class="summary-label">支出合計</div>
+          <div id="settlementExpenseTotal" class="summary-value">0 円</div>
+        </article>
+        <article class="summary-card settlement-balance">
+          <div class="summary-label">差引額</div>
+          <div id="settlementBalanceTotal" class="summary-value">0 円</div>
+        </article>
+      </div>
+
+      <div id="settlementPdfResult" class="card pdf-result-card hidden"></div>
+
+      <div class="card table-card">
+        <div class="card-title-row">
+          <div>
+            <div class="card-title">決算明細</div>
+            <div class="inline-note">年度で有効な科目を優先表示し、予算額・決算額・差額・備考を確認できます。</div>
+          </div>
+          <div id="settlementCountLabel" class="inline-note">0件</div>
+        </div>
+        <div class="table-wrap settlement-table-wrap">
+          <table class="settlement-table">
+            <thead>
+              <tr>
+                <th>収支区分</th>
+                <th>科目コード</th>
+                <th>科目名</th>
+                <th class="text-right">予算額</th>
+                <th class="text-right">決算額</th>
+                <th class="text-right">差額</th>
+                <th>備考</th>
+              </tr>
+            </thead>
+            <tbody id="settlementTableBody">
+              <tr><td colspan="7" class="empty-cell">データを読み込んでください</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  `;
+  if (budgetSection) {
+    budgetSection.insertAdjacentHTML('afterend', html);
+  } else {
+    contentArea.insertAdjacentHTML('beforeend', html);
+  }
+}
+
+function ensureSwitchYearModal_() {
+  if (document.getElementById('switchYearModal')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="switchYearModal" class="modal hidden">
+      <div class="modal-backdrop" data-close-modal="switchYearModal"></div>
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h3>年度切替</h3>
+          <button class="icon-button" type="button" data-close-modal="switchYearModal">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="inline-note modal-note">青系 = 今年度 / オレンジ系 = 過年度 / グリーン系 = 未来年度</p>
+          <div id="switchYearList" class="year-option-list"></div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function getFiscalYearFromDate(date) {
+  const target = date instanceof Date ? date : new Date(date);
+  const year = target.getFullYear();
+  const month = target.getMonth() + 1;
+  return month >= 10 ? year : year - 1;
+}
+
+function getCurrentFiscalYear_() {
+  return getFiscalYearFromDate(new Date());
+}
+
+function toJapaneseEraFiscalYearLabel_(year) {
+  const n = Number(year);
+  if (!n) return `${year}年度`;
+  if (n >= 2019) return `令和${n - 2018}年度`;
+  if (n >= 1989) return `平成${n - 1988}年度`;
+  return `${n}年度`;
+}
+
+function formatFiscalYearDisplay_(year) {
+  const n = Number(year);
+  if (!n) return '-';
+  return `${n}年度（${toJapaneseEraFiscalYearLabel_(n)}）`;
+}
+
+function getFiscalYearStatus_(year) {
+  const current = getCurrentFiscalYear_();
+  const n = Number(year);
+  if (!n) return 'current';
+  if (n === current) return 'current';
+  if (n < current) return 'past';
+  return 'future';
+}
+
+function getFiscalYearStatusText_(status) {
+  if (status === 'past') return '過年度';
+  if (status === 'future') return '未来年度';
+  return '今年度';
+}
+
+function getManagedFiscalYearSelects_() {
+  return [
+    els.startupFiscalYear,
+    els.homeFiscalYear,
+    els.expenseFiscalYear,
+    els.formFiscalYear,
+    els.travelTransferFiscalYear,
+    els.incomeFiscalYear,
+    els.incomeFormFiscalYear,
+    els.budgetFiscalYear,
+    els.subjectFiscalYear,
+    els.settlementFiscalYear
+  ].filter(Boolean);
+}
+
+function restoreCurrentFiscalYear() {
+  try {
+    const saved = Number(localStorage.getItem(storageKeys.currentFiscalYear) || '');
+    state.currentFiscalYear = Number.isFinite(saved) && saved > 0 ? saved : getCurrentFiscalYear_();
+  } catch (error) {
+    console.warn(error);
+    state.currentFiscalYear = getCurrentFiscalYear_();
+  }
+}
+
+function saveCurrentFiscalYear(year) {
+  const numericYear = Number(year);
+  state.currentFiscalYear = numericYear || getCurrentFiscalYear_();
+  try {
+    localStorage.setItem(storageKeys.currentFiscalYear, String(state.currentFiscalYear));
+  } catch (error) {
+    console.warn(error);
+  }
+  applyFiscalYearUi_();
+}
+
+function populateFiscalYearOptions() {
+  const currentYear = state.currentFiscalYear || getCurrentFiscalYear_();
+  const years = [];
+  for (let i = currentYear - 3; i <= currentYear + 2; i += 1) years.push(i);
+  getManagedFiscalYearSelects_().forEach(function(select) {
+    const currentValue = Number(select.value || currentYear);
+    select.innerHTML = years.map(function(year) {
+      const selected = year === currentValue || year === currentYear ? ' selected' : '';
+      return `<option value="${year}"${selected}>${formatFiscalYearDisplay_(year)}</option>`;
+    }).join('');
+  });
+  applyFiscalYearUi_();
+}
+
+function applyFiscalYearUi_() {
+  const fiscalYear = Number(state.currentFiscalYear || getCurrentFiscalYear_());
+  const status = getFiscalYearStatus_(fiscalYear);
+  const className = `fiscal-year-badge fiscal-status-${status}`;
+  getManagedFiscalYearSelects_().forEach(function(select) {
+    select.value = String(fiscalYear);
+    select.classList.remove('fiscal-status-select-current', 'fiscal-status-select-past', 'fiscal-status-select-future');
+    select.classList.add(`fiscal-status-select-${status}`);
+  });
+  if (els.currentFiscalYearLabel) {
+    els.currentFiscalYearLabel.className = className;
+    els.currentFiscalYearLabel.textContent = formatFiscalYearDisplay_(fiscalYear);
+  }
+  if (els.startupYearStatus) {
+    els.startupYearStatus.className = className;
+    els.startupYearStatus.textContent = `${formatFiscalYearDisplay_(fiscalYear)} / ${getFiscalYearStatusText_(status)}`;
+  }
+}
+
+function updateCurrentUserDisplay() {
+  if (els.currentUserName) {
+    els.currentUserName.textContent = state.currentUser ? state.currentUser.name : '未選択';
+  }
+  applyFiscalYearUi_();
+}
+
+function showUserSelectScreen() {
+  if (els.userSelectScreen) els.userSelectScreen.classList.remove('hidden');
+  if (els.appShell) els.appShell.classList.add('hidden');
+  applyFiscalYearUi_();
+}
+
+function showAppShell() {
+  if (els.userSelectScreen) els.userSelectScreen.classList.add('hidden');
+  if (els.appShell) els.appShell.classList.remove('hidden');
+  applyFiscalYearUi_();
+}
+
+function bindFiscalYearChange_(select) {
+  if (!select) return;
+  select.addEventListener('change', function() {
+    const nextYear = Number(select.value || getCurrentFiscalYear_());
+    if (nextYear === Number(state.currentFiscalYear || 0)) {
+      applyFiscalYearUi_();
+      return;
+    }
+    if (hasUnsavedChanges() && !window.confirm(UNSAVED_CHANGES_MESSAGE)) {
+      select.value = String(state.currentFiscalYear || getCurrentFiscalYear_());
+      applyFiscalYearUi_();
+      return;
+    }
+    if (typeof discardAllUnsavedChanges === 'function') discardAllUnsavedChanges();
+    saveCurrentFiscalYear(nextYear);
+    refreshPageForFiscalYearChange_();
+  });
+}
+
+async function refreshPageForFiscalYearChange_() {
+  if (!state.currentUser) return;
+  try {
+    await loadSubjects();
+    const page = getCurrentPageName();
+    if (page === 'home') return await loadHomeSummary();
+    if (page === 'expenses') return await loadExpenseList();
+    if (page === 'incomes') return await loadIncomeList();
+    if (page === 'budget') return await loadBudgetPage({ force: true });
+    if (page === 'subjects') return await loadSubjectMaster();
+    if (page === 'settlement') return await loadSettlementPage();
+    if (page === 'expense-form' && state.expenseForm.mode !== 'edit') return prepareExpenseForm('create');
+    if (page === 'income-form' && state.incomeForm.mode !== 'edit') return prepareIncomeForm('create');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+function renderYearSwitchList_() {
+  if (!els.switchYearList) return;
+  const baseYear = Number(state.currentFiscalYear || getCurrentFiscalYear_());
+  const years = [];
+  for (let i = baseYear - 3; i <= baseYear + 2; i += 1) years.push(i);
+  els.switchYearList.innerHTML = years.map(function(year) {
+    const status = getFiscalYearStatus_(year);
+    return `
+      <button type="button" class="year-option-card fiscal-status-${status}" data-switch-year="${year}">
+        <strong>${escapeHtml(formatFiscalYearDisplay_(year))}</strong>
+        <div class="sub">${escapeHtml(getFiscalYearStatusText_(status))} / 10月開始〜翌9月終了</div>
+      </button>
+    `;
+  }).join('');
+  els.switchYearList.querySelectorAll('[data-switch-year]').forEach(function(button) {
+    button.addEventListener('click', async function() {
+      const nextYear = Number(button.dataset.switchYear || 0);
+      if (nextYear === Number(state.currentFiscalYear || 0)) {
+        closeModal('switchYearModal', { force: true });
+        return;
+      }
+      if (hasUnsavedChanges() && !window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+      if (typeof discardAllUnsavedChanges === 'function') discardAllUnsavedChanges();
+      saveCurrentFiscalYear(nextYear);
+      closeModal('switchYearModal', { force: true });
+      await refreshPageForFiscalYearChange_();
+      showToast(`表示年度を ${formatFiscalYearDisplay_(nextYear)} に切り替えました`, 'success');
+    });
+  });
+}
+
+function openSwitchYearModal() {
+  renderYearSwitchList_();
+  openModal('switchYearModal');
+}
+
+async function selectUserAndEnter(user) {
+  if (hasUnsavedChanges() && !window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+  if (typeof discardAllUnsavedChanges === 'function') discardAllUnsavedChanges();
+  saveCurrentUser(user);
+  saveCurrentFiscalYear(Number((els.startupFiscalYear && els.startupFiscalYear.value) || state.currentFiscalYear || getCurrentFiscalYear_()));
+  showAppShell();
+  await loadSubjects();
+  prepareExpenseForm('create');
+  prepareIncomeForm('create');
+  switchPage('home');
+  showToast(`${user.name} さんで ${formatFiscalYearDisplay_(state.currentFiscalYear)} を開始しました`, 'success');
+  await loadHomeSummary();
+}
+
+async function switchCurrentUser(user) {
+  if (hasUnsavedChanges() && !window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+  if (typeof discardAllUnsavedChanges === 'function') discardAllUnsavedChanges();
+  saveCurrentUser(user);
+  closeModal('switchUserModal');
+  showToast(`現在ユーザーを ${user.name} さんに切り替えました`, 'success');
+}
+
+function bindEvents() {
+  const on = function(el, eventName, handler) { if (el) el.addEventListener(eventName, handler); };
+
+  on(els.reloadUsersButton, 'click', function() { loadUsers(); });
+  on(els.userSearchInput, 'input', function() {
+    renderUserList(els.userList, state.users, els.userSearchInput.value, selectUserAndEnter);
+  });
+  on(els.switchUserSearchInput, 'input', function() {
+    renderUserList(els.switchUserList, state.users, els.switchUserSearchInput.value, switchCurrentUser);
+  });
+  on(els.switchUserButton, 'click', openSwitchUserModal);
+  on(els.openSwitchUserFromHome, 'click', openSwitchUserModal);
+  on(els.switchFiscalYearButton, 'click', openSwitchYearModal);
+  on(els.refreshHomeButton, 'click', function() { loadHomeSummary(); });
+
+  on(els.goExpensesButton, 'click', function() { if (switchPage('expenses')) loadExpenseList(); });
+  on(els.goExpenseCreateButton, 'click', openExpenseCreateForm);
+  on(els.goIncomesButton, 'click', function() { if (switchPage('incomes')) loadIncomeList(); });
+  on(els.goIncomeCreateButton, 'click', openIncomeCreateForm);
+  on(els.openTravelTransferFromHome, 'click', function() { openTravelTransferModal(); });
+
+  on(els.searchExpensesButton, 'click', function() { loadExpenseList(); });
+  on(els.expenseKeyword, 'keydown', function(event) { if (event.key === 'Enter') { event.preventDefault(); loadExpenseList(); } });
+  on(els.openExpenseCreateButton, 'click', openExpenseCreateForm);
+  on(els.openTravelTransferButton, 'click', function() { openTravelTransferModal(); });
+  on(els.editExpenseButton, 'click', function() {
+    if (!state.selectedExpense || !state.selectedExpense.voucher) return;
+    openExpenseEditForm(state.selectedExpense.voucher, state.selectedExpense.evidence || null);
+  });
+  on(els.deleteExpenseButton, 'click', deleteSelectedExpense);
+  on(els.backToExpenseListButton, 'click', function() { if (switchPage('expenses')) loadExpenseList(); });
+  on(els.resetExpenseFormButton, 'click', function() {
+    if (state.expenseForm.mode === 'edit' && state.selectedExpense && state.selectedExpense.voucher) {
+      openExpenseEditForm(state.selectedExpense.voucher, state.selectedExpense.evidence || null);
+      return;
+    }
+    prepareExpenseForm('create');
+    showToast('入力内容をリセットしました', 'success');
+  });
+  on(els.openTravelTransferFromForm, 'click', function() { openTravelTransferModal(); });
+  on(els.saveExpenseButton, 'click', function() { saveExpense(false); });
+  on(els.saveExpenseButtonBottom, 'click', function() { saveExpense(false); });
+  on(els.formEvidenceFile, 'change', onExpenseEvidenceFileChange);
+  on(els.removeEvidenceCheckbox, 'change', renderExpenseFormEvidenceInfo);
+
+  on(els.searchIncomesButton, 'click', function() { loadIncomeList(); });
+  on(els.incomeKeyword, 'keydown', function(event) { if (event.key === 'Enter') { event.preventDefault(); loadIncomeList(); } });
+  on(els.openIncomeCreateButton, 'click', openIncomeCreateForm);
+  on(els.editIncomeButton, 'click', function() {
+    if (!state.selectedIncome || !state.selectedIncome.voucher) return;
+    openIncomeEditForm(state.selectedIncome.voucher, state.selectedIncome.evidence || null);
+  });
+  on(els.deleteIncomeButton, 'click', deleteSelectedIncome);
+  on(els.backToIncomeListButton, 'click', function() { if (switchPage('incomes')) loadIncomeList(); });
+  on(els.resetIncomeFormButton, 'click', function() {
+    if (state.incomeForm.mode === 'edit' && state.selectedIncome && state.selectedIncome.voucher) {
+      openIncomeEditForm(state.selectedIncome.voucher, state.selectedIncome.evidence || null);
+      return;
+    }
+    prepareIncomeForm('create');
+    showToast('入力内容をリセットしました', 'success');
+  });
+  on(els.saveIncomeButton, 'click', function() { saveIncome(false); });
+  on(els.saveIncomeButtonBottom, 'click', function() { saveIncome(false); });
+  on(els.incomeFormEvidenceFile, 'change', onIncomeEvidenceFileChange);
+  on(els.incomeRemoveEvidenceCheckbox, 'change', renderIncomeFormEvidenceInfo);
+
+  on(els.searchMembersButton, 'click', renderMemberTable);
+  on(els.reloadMembersButton, 'click', reloadMemberMaster);
+  on(els.saveMemberOrderButton, 'click', saveMemberOrder);
+  on(els.resetMemberOrderButton, 'click', resetMemberOrder);
+  on(els.memberKeyword, 'keydown', function(event) { if (event.key === 'Enter') { event.preventDefault(); renderMemberTable(); } });
+  on(els.openMemberCreateButton, 'click', openMemberCreateModal);
+  on(els.editMemberButton, 'click', function() { if (state.selectedMember) openMemberEditModal(state.selectedMember); });
+  on(els.deleteMemberButton, 'click', deleteSelectedMember);
+  on(els.memberFormSaveButton, 'click', saveMember);
+
+  on(els.searchSubjectsButton, 'click', function() { loadSubjectMaster(); });
+  on(els.reloadSubjectsButton, 'click', function() { loadSubjectMaster(); });
+  on(els.subjectTypeFilter, 'change', function() { loadSubjectMaster(); });
+  on(els.subjectKeyword, 'keydown', function(event) { if (event.key === 'Enter') { event.preventDefault(); loadSubjectMaster(); } });
+  on(els.openSubjectCreateButton, 'click', openSubjectCreateModal);
+  on(els.editSubjectButton, 'click', function() { if (state.selectedSubject) openSubjectEditModal(state.selectedSubject); });
+  on(els.deleteSubjectButton, 'click', deleteSelectedSubject);
+  on(els.subjectFormSaveButton, 'click', saveSubject);
+
+  on(els.reloadBudgetButton, 'click', function() { loadBudgetPage(); });
+  on(els.budgetTypeFilter, 'change', function() { renderBudgetTable(); });
+  on(els.exportBudgetPdfButton, 'click', generateBudgetPdf);
+  on(els.saveBudgetButton, 'click', saveBudgetRows);
+
+  on(els.refreshSettlementButton, 'click', loadSettlementPage);
+  on(els.exportSettlementPdfButton, 'click', generateSettlementPdf);
+
+  on(els.searchTravelTransferButton, 'click', function() { loadTravelTransferList(); });
+  on(els.travelTransferKeyword, 'keydown', function(event) { if (event.key === 'Enter') { event.preventDefault(); loadTravelTransferList(); } });
+
+  getManagedFiscalYearSelects_().forEach(bindFiscalYearChange_);
+
+  document.querySelectorAll('.side-nav-button[data-page]').forEach(function(button) {
+    button.addEventListener('click', function() {
+      const page = button.dataset.page;
+      if (!switchPage(page)) return;
+      if (page === 'home') loadHomeSummary();
+      if (page === 'expenses') loadExpenseList();
+      if (page === 'expense-form' && !state.expenseForm.voucherNo && state.expenseForm.mode !== 'edit') prepareExpenseForm('create');
+      if (page === 'incomes') loadIncomeList();
+      if (page === 'income-form' && !state.incomeForm.voucherNo && state.incomeForm.mode !== 'edit') prepareIncomeForm('create');
+      if (page === 'members') loadMemberMaster();
+      if (page === 'subjects') loadSubjectMaster();
+      if (page === 'budget') loadBudgetPage();
+      if (page === 'settlement') loadSettlementPage();
+    });
+  });
+
+  document.querySelectorAll('[data-close-modal]').forEach(function(button) {
+    button.addEventListener('click', function() { closeModal(button.dataset.closeModal); });
+  });
+}
+
+async function init() {
+  ensureEnhancedLayout_();
+  cacheEnhancedEls_();
+  bindEvents();
+  bindUnsavedChangeListeners();
+  restoreCurrentFiscalYear();
+  populateFiscalYearOptions();
+  restoreCurrentUser();
+  await loadUsers();
+
+  if (state.currentUser) {
+    showAppShell();
+    await loadSubjects();
+    prepareExpenseForm('create');
+    prepareIncomeForm('create');
+    if (els.budgetTypeFilter) els.budgetTypeFilter.value = '';
+    switchPage('home', { force: true });
+    await loadHomeSummary();
+  } else {
+    showUserSelectScreen();
+  }
+}
+
+async function loadSubjects() {
+  showLoading('科目一覧を読み込んでいます...');
+  try {
+    const fiscalYear = Number(state.currentFiscalYear || getCurrentFiscalYear_());
+    const [expenseResult, incomeResult] = await Promise.all([
+      apiGet('accounting/listSubjects', { type: '支出', fiscalYear: fiscalYear }),
+      apiGet('accounting/listSubjects', { type: '収入', fiscalYear: fiscalYear })
+    ]);
+    state.expenseSubjects = expenseResult.subjects || [];
+    state.incomeSubjects = incomeResult.subjects || [];
+  } catch (error) {
+    state.expenseSubjects = [];
+    state.incomeSubjects = [];
+    showToast(error.message, 'error');
+  } finally {
+    renderExpenseSubjectOptions();
+    renderIncomeSubjectOptions();
+    hideLoading();
+  }
+}
+
+async function loadSubjectMaster() {
+  if (!state.currentUser) return showUserSelectScreen();
+  showLoading('科目一覧を読み込んでいます...');
+  try {
+    const fiscalYear = Number((els.subjectFiscalYear && els.subjectFiscalYear.value) || state.currentFiscalYear || getCurrentFiscalYear_());
+    const result = await apiGet('accounting/listSubjects', {
+      type: els.subjectTypeFilter ? els.subjectTypeFilter.value : '',
+      keyword: (els.subjectKeyword && els.subjectKeyword.value || '').trim(),
+      fiscalYear: fiscalYear,
+      includeDisabled: 'true'
+    });
+    state.subjectMasterRows = (result.subjects || []).slice().sort(function(a, b) {
+      const typeOrder = { '収入': 0, '支出': 1 };
+      const aType = Object.prototype.hasOwnProperty.call(typeOrder, a['収支区分']) ? typeOrder[a['収支区分']] : 9;
+      const bType = Object.prototype.hasOwnProperty.call(typeOrder, b['収支区分']) ? typeOrder[b['収支区分']] : 9;
+      if (aType !== bType) return aType - bType;
+      const orderComp = Number(a['表示順'] || 0) - Number(b['表示順'] || 0);
+      if (orderComp !== 0) return orderComp;
+      return String(a['科目コード'] || '').localeCompare(String(b['科目コード'] || ''), 'ja');
+    });
+    renderSubjectTable();
+    if (state.selectedSubject) {
+      const matched = state.subjectMasterRows.find(function(row) { return row['科目コード'] === state.selectedSubject['科目コード']; });
+      matched ? renderSubjectDetail(matched) : clearSubjectDetail();
+    } else {
+      clearSubjectDetail();
+    }
+  } catch (error) {
+    state.subjectMasterRows = [];
+    renderSubjectTable();
+    clearSubjectDetail();
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function renderSubjectDetail(subject) {
+  state.selectedSubject = subject;
+  els.subjectDetailEmpty.classList.add('hidden');
+  els.subjectDetailBody.classList.remove('hidden');
+  els.subjectDetailCode.textContent = subject['科目コード'] || '-';
+  els.subjectDetailName.textContent = subject['科目名'] || '-';
+  els.subjectDetailType.textContent = subject['収支区分'] || '-';
+  els.subjectDetailSortOrder.textContent = String(subject['表示順'] || 0);
+  els.subjectDetailEnabled.textContent = String(subject['使用可否']) !== 'false' ? '使用中' : '停止';
+  els.subjectDetailNote.textContent = subject['備考'] || '-';
+  els.editSubjectButton.disabled = false;
+  els.deleteSubjectButton.disabled = false;
+  renderSubjectTable();
+}
+
+function openSubjectCreateModal() {
+  state.subjectForm = { mode: 'create', subjectCode: '', initialSubject: null };
+  els.subjectFormModalTitle.textContent = '科目登録';
+  els.subjectFormCode.readOnly = false;
+  els.subjectCodeReadonlyRow.classList.remove('readonly-field');
+  els.subjectFormCode.value = '';
+  els.subjectFormCode.required = true;
+  els.subjectFormName.value = '';
+  els.subjectFormType.value = els.subjectTypeFilter.value || '';
+  els.subjectFormSortOrder.value = '';
+  els.subjectFormNote.value = '';
+  els.subjectFormEnabled.checked = true;
+  openModal('subjectFormModal');
+  setUnsavedBaseline('subjectForm', getSubjectFormSnapshot());
+}
+
+function openSubjectEditModal(subject) {
+  state.subjectForm = { mode: 'edit', subjectCode: subject['科目コード'] || '', initialSubject: clonePlain(subject) || null };
+  els.subjectFormModalTitle.textContent = `科目編集：${subject['科目コード'] || ''}`;
+  els.subjectFormCode.readOnly = true;
+  els.subjectCodeReadonlyRow.classList.add('readonly-field');
+  els.subjectFormCode.value = subject['科目コード'] || '';
+  els.subjectFormCode.required = false;
+  els.subjectFormName.value = subject['科目名'] || '';
+  els.subjectFormType.value = subject['収支区分'] || '';
+  els.subjectFormSortOrder.value = String(subject['表示順'] || 0);
+  els.subjectFormNote.value = subject['備考'] || '';
+  els.subjectFormEnabled.checked = String(subject['使用可否']) !== 'false';
+  openModal('subjectFormModal');
+  setUnsavedBaseline('subjectForm', getSubjectFormSnapshot());
+}
+
+async function saveSubject() {
+  if (!state.currentUser) return showToast('利用者を選択してください', 'error');
+  try {
+    const fiscalYear = Number((els.subjectFiscalYear && els.subjectFiscalYear.value) || state.currentFiscalYear || getCurrentFiscalYear_());
+    const subjectCode = requireValue(els.subjectFormCode.value, '科目コードを入力してください').trim();
+    const subjectName = requireValue(els.subjectFormName.value, '科目名を入力してください').trim();
+    const type = requireValue(els.subjectFormType.value, '収支区分を選択してください');
+    const sortOrder = Number(els.subjectFormSortOrder.value || 0);
+    const data = {
+      fiscalYear: fiscalYear,
+      subjectCode: subjectCode,
+      subjectName: subjectName,
+      type: type,
+      sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
+      enabled: els.subjectFormEnabled.checked,
+      note: els.subjectFormNote.value.trim()
+    };
+    showLoading(state.subjectForm.mode === 'edit' ? '科目を更新しています...' : '科目を登録しています...');
+    if (state.subjectForm.mode === 'edit') {
+      await apiPost('accounting/updateSubject', { currentUser: state.currentUser, fiscalYear: fiscalYear, subjectCode: state.subjectForm.subjectCode, data: data });
+      showToast('科目を更新しました', 'success');
+    } else {
+      await apiPost('accounting/createSubject', { currentUser: state.currentUser, fiscalYear: fiscalYear, data: data });
+      showToast('科目を登録しました', 'success');
+    }
+    clearUnsavedContext('subjectForm');
+    closeModal('subjectFormModal', { force: true });
+    await loadSubjects();
+    await loadSubjectMaster();
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function deleteSelectedSubject() {
+  if (!state.selectedSubject) return;
+  const fiscalYear = Number((els.subjectFiscalYear && els.subjectFiscalYear.value) || state.currentFiscalYear || getCurrentFiscalYear_());
+  const code = state.selectedSubject['科目コード'] || '';
+  if (!window.confirm(`${code} を削除します。全年度設定からも削除されます。よろしいですか。`)) return;
+  showLoading('科目を削除しています...');
+  try {
+    await apiPost('accounting/deleteSubject', { currentUser: state.currentUser, fiscalYear: fiscalYear, subjectCode: code });
+    showToast('科目を削除しました', 'success');
+    clearSubjectDetail();
+    await loadSubjects();
+    await loadSubjectMaster();
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function loadHomeSummary() {
+  if (!state.currentUser) {
+    showUserSelectScreen();
+    return;
+  }
+  showLoading('ホーム情報を集計しています...');
+  try {
+    const fiscalYear = Number((els.homeFiscalYear && els.homeFiscalYear.value) || state.currentFiscalYear || getCurrentFiscalYear_());
+    const [expenseResult, incomeResult] = await Promise.all([
+      apiGet('accounting/listExpenseVouchers', { fiscalYear: fiscalYear }),
+      apiGet('accounting/listIncomeVouchers', { fiscalYear: fiscalYear })
+    ]);
+    const expenseRows = expenseResult.vouchers || [];
+    const incomeRows = incomeResult.vouchers || [];
+    const expenseTotal = expenseRows.reduce(function(sum, row) { return sum + Number(row['支出金額'] || 0); }, 0);
+    const incomeTotal = incomeRows.reduce(function(sum, row) { return sum + Number(row['収入金額'] || 0); }, 0);
+    const balanceTotal = incomeTotal - expenseTotal;
+    els.homeExpenseTotal.textContent = formatCurrency(expenseTotal);
+    els.homeIncomeTotal.textContent = formatCurrency(incomeTotal);
+    els.homeBalanceTotal.textContent = formatCurrency(balanceTotal);
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function prepareExpenseForm(mode, options) {
+  const source = options || {};
+  state.expenseForm.initialSource = clonePlain(source || {});
+  state.expenseForm.mode = mode;
+  state.expenseForm.voucherNo = '';
+  state.expenseForm.existingEvidence = null;
+  state.expenseForm.pendingEvidenceFile = null;
+  state.expenseForm.selectedTravel = null;
+  els.formEvidenceFile.value = '';
+  els.removeEvidenceCheckbox.checked = false;
+
+  if (mode === 'edit' && source.voucher) {
+    const voucher = source.voucher;
+    state.expenseForm.voucherNo = voucher['伝票番号'] || '';
+    state.expenseForm.existingEvidence = source.evidence || null;
+    els.expenseFormTitle.textContent = `支出伝票編集：${voucher['伝票番号'] || ''}`;
+    els.formVoucherNo.value = voucher['伝票番号'] || '';
+    els.formFiscalYear.value = String(voucher['年度'] || state.currentFiscalYear || getCurrentFiscalYear_());
+    renderExpenseSubjectOptions(voucher['科目コード'] || '');
+    els.formExpenseDate.value = toDateInputValue(voucher['支出日']);
+    els.formSummary.value = voucher['摘要'] || '';
+    els.formPayee.value = voucher['支払先'] || '';
+    els.formAmount.value = toNumericInputValue(voucher['支出金額']);
+    els.formRelatedTravelControlNo.value = voucher['関連旅費管理番号'] || '';
+    els.formNote.value = voucher['備考'] || '';
+    els.removeEvidenceRow.classList.remove('hidden');
+    renderExpenseFormEvidenceInfo();
+    setUnsavedBaseline('expenseForm', getExpenseFormSnapshot());
+    return;
+  }
+
+  const travel = source.travel || null;
+  const defaultYear = Number(travel ? (travel.fiscalYear || state.currentFiscalYear || getCurrentFiscalYear_()) : (state.currentFiscalYear || getCurrentFiscalYear_()));
+  state.expenseForm.selectedTravel = travel;
+  els.expenseFormTitle.textContent = travel ? '支出伝票登録（旅費申請から転記）' : '支出伝票登録';
+  els.formVoucherNo.value = '';
+  els.formFiscalYear.value = String(defaultYear);
+  renderExpenseSubjectOptions('EXP001');
+  els.formExpenseDate.value = travel ? toDateInputValue(travel.travelDate) : todayInputValue();
+  els.formSummary.value = travel ? [travel.tripName, travel.driverName].filter(Boolean).join(' / ') : '';
+  els.formPayee.value = travel ? (travel.driverName || '') : '';
+  els.formAmount.value = travel ? toNumericInputValue(travel.paymentAmount) : '';
+  els.formRelatedTravelControlNo.value = travel ? (travel.controlNo || '') : '';
+  els.formNote.value = travel ? (travel.note || '') : '';
+  els.removeEvidenceRow.classList.add('hidden');
+  renderExpenseFormEvidenceInfo();
+  setUnsavedBaseline('expenseForm', getExpenseFormSnapshot());
+}
+
+function prepareIncomeForm(mode, options) {
+  const source = options || {};
+  state.incomeForm.initialSource = clonePlain(source || {});
+  state.incomeForm.mode = mode;
+  state.incomeForm.voucherNo = '';
+  state.incomeForm.existingEvidence = null;
+  state.incomeForm.pendingEvidenceFile = null;
+  els.incomeFormEvidenceFile.value = '';
+  els.incomeRemoveEvidenceCheckbox.checked = false;
+
+  if (mode === 'edit' && source.voucher) {
+    const voucher = source.voucher;
+    state.incomeForm.voucherNo = voucher['伝票番号'] || '';
+    state.incomeForm.existingEvidence = source.evidence || null;
+    els.incomeFormTitle.textContent = `収入伝票編集：${voucher['伝票番号'] || ''}`;
+    els.incomeFormVoucherNo.value = voucher['伝票番号'] || '';
+    els.incomeFormFiscalYear.value = String(voucher['年度'] || state.currentFiscalYear || getCurrentFiscalYear_());
+    renderIncomeSubjectOptions(voucher['科目コード'] || '');
+    els.incomeFormDate.value = toDateInputValue(voucher['収入日']);
+    els.incomeFormSummary.value = voucher['摘要'] || '';
+    els.incomeFormPayer.value = voucher['入金元'] || '';
+    els.incomeFormAmount.value = toNumericInputValue(voucher['収入金額']);
+    els.incomeFormNote.value = voucher['備考'] || '';
+    els.incomeRemoveEvidenceRow.classList.remove('hidden');
+    renderIncomeFormEvidenceInfo();
+    setUnsavedBaseline('incomeForm', getIncomeFormSnapshot());
+    return;
+  }
+
+  const defaultYear = Number(state.currentFiscalYear || getCurrentFiscalYear_());
+  els.incomeFormTitle.textContent = '収入伝票登録';
+  els.incomeFormVoucherNo.value = '';
+  els.incomeFormFiscalYear.value = String(defaultYear);
+  renderIncomeSubjectOptions('INC001');
+  els.incomeFormDate.value = todayInputValue();
+  els.incomeFormSummary.value = '';
+  els.incomeFormPayer.value = '';
+  els.incomeFormAmount.value = '';
+  els.incomeFormNote.value = '';
+  els.incomeRemoveEvidenceRow.classList.add('hidden');
+  renderIncomeFormEvidenceInfo();
+  setUnsavedBaseline('incomeForm', getIncomeFormSnapshot());
+}
+
+async function loadBudgetPage(options) {
+  const opts = options || {};
+  if (!state.currentUser) return showUserSelectScreen();
+  if (!opts.force && getCurrentPageName() === 'budget' && hasUnsavedChanges('budget')) {
+    if (!window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+    clearUnsavedContext('budget');
+  }
+  clearBudgetPdfResult();
+  showLoading('予算書を読み込んでいます...');
+  try {
+    const fiscalYear = Number(requireValue((els.budgetFiscalYear && els.budgetFiscalYear.value) || state.currentFiscalYear, '年度を選択してください'));
+    const previousFiscalYear = fiscalYear - 1;
+    const [expenseSubjectsResult, incomeSubjectsResult, currentBudgetResult, previousBudgetResult, currentExpenseResult, currentIncomeResult, previousExpenseResult, previousIncomeResult] = await Promise.all([
+      apiGet('accounting/listSubjects', { type: '支出', fiscalYear: fiscalYear }),
+      apiGet('accounting/listSubjects', { type: '収入', fiscalYear: fiscalYear }),
+      apiGet('accounting/listBudgetRows', { fiscalYear: fiscalYear }),
+      apiGet('accounting/listBudgetRows', { fiscalYear: previousFiscalYear }),
+      apiGet('accounting/listExpenseVouchers', { fiscalYear: fiscalYear }),
+      apiGet('accounting/listIncomeVouchers', { fiscalYear: fiscalYear }),
+      apiGet('accounting/listExpenseVouchers', { fiscalYear: previousFiscalYear }),
+      apiGet('accounting/listIncomeVouchers', { fiscalYear: previousFiscalYear })
+    ]);
+
+    const subjectSeedRows = [];
+    (expenseSubjectsResult.subjects || []).forEach(function(row) { subjectSeedRows.push(row); });
+    (incomeSubjectsResult.subjects || []).forEach(function(row) { subjectSeedRows.push(row); });
+
+    const currentBudgetRows = currentBudgetResult.rows || [];
+    const previousBudgetRows = previousBudgetResult.rows || [];
+    const currentExpenses = currentExpenseResult.vouchers || [];
+    const currentIncomes = currentIncomeResult.vouchers || [];
+    const previousExpenses = previousExpenseResult.vouchers || [];
+    const previousIncomes = previousIncomeResult.vouchers || [];
+
+    const currentActualMap = {};
+    currentExpenses.forEach(function(row) {
+      const key = ['支出', row['科目コード'] || ''].join('|');
+      currentActualMap[key] = Number(currentActualMap[key] || 0) + Number(row['支出金額'] || 0);
+    });
+    currentIncomes.forEach(function(row) {
+      const key = ['収入', row['科目コード'] || ''].join('|');
+      currentActualMap[key] = Number(currentActualMap[key] || 0) + Number(row['収入金額'] || 0);
+    });
+
+    const previousBudgetMap = {};
+    previousBudgetRows.forEach(function(row) {
+      const key = [row['収支区分'] || '', row['科目コード'] || ''].join('|');
+      const initialBudget = Number(row['当初予算額'] || 0);
+      const revisedBudget = Number(row['補正予算額'] || 0);
+      const budgetTotal = Number(row['予算合計額'] || 0);
+      const mergedBudget = initialBudget + revisedBudget;
+      previousBudgetMap[key] = mergedBudget || budgetTotal || 0;
+    });
+
+    const previousSettlementMap = {};
+    previousExpenses.forEach(function(row) {
+      const key = ['支出', row['科目コード'] || ''].join('|');
+      previousSettlementMap[key] = Number(previousSettlementMap[key] || 0) + Number(row['支出金額'] || 0);
+    });
+    previousIncomes.forEach(function(row) {
+      const key = ['収入', row['科目コード'] || ''].join('|');
+      previousSettlementMap[key] = Number(previousSettlementMap[key] || 0) + Number(row['収入金額'] || 0);
+    });
+
+    const rowMap = {};
+    subjectSeedRows.forEach(function(row) {
+      const key = [row['収支区分'] || '', row['科目コード'] || ''].join('|');
+      rowMap[key] = {
+        fiscalYear: fiscalYear,
+        type: row['収支区分'] || '',
+        subjectCode: row['科目コード'] || '',
+        subjectName: row['科目名'] || '',
+        initialBudget: 0,
+        revisedBudget: 0,
+        actualAmount: Number(currentActualMap[key] || 0),
+        previousBudgetAmount: Number(previousBudgetMap[key] || 0),
+        previousSettlementAmount: Number(previousSettlementMap[key] || 0),
+        note: '',
+        enabled: String(row['使用可否']) !== 'false',
+        sortOrder: Number(row['表示順'] || 0)
+      };
+    });
+
+    currentBudgetRows.forEach(function(row) {
+      const key = [row['収支区分'] || '', row['科目コード'] || ''].join('|');
+      const current = rowMap[key] || {};
+      rowMap[key] = Object.assign(current, {
+        fiscalYear: fiscalYear,
+        type: row['収支区分'] || current.type || '',
+        subjectCode: row['科目コード'] || current.subjectCode || '',
+        subjectName: row['科目名'] || current.subjectName || '',
+        initialBudget: Number(row['当初予算額'] || row['予算合計額'] || 0),
+        revisedBudget: 0,
+        actualAmount: Number(currentActualMap[key] || row['実績額'] || 0),
+        previousBudgetAmount: Number(previousBudgetMap[key] || 0),
+        previousSettlementAmount: Number(previousSettlementMap[key] || 0),
+        note: row['備考'] || '',
+        sortOrder: Number(current.sortOrder || 0)
+      });
+    });
+
+    Object.keys(currentActualMap).forEach(function(key) {
+      if (rowMap[key]) return;
+      const parts = key.split('|');
+      rowMap[key] = {
+        fiscalYear: fiscalYear,
+        type: parts[0] || '',
+        subjectCode: parts[1] || '',
+        subjectName: '',
+        initialBudget: 0,
+        revisedBudget: 0,
+        actualAmount: Number(currentActualMap[key] || 0),
+        previousBudgetAmount: Number(previousBudgetMap[key] || 0),
+        previousSettlementAmount: Number(previousSettlementMap[key] || 0),
+        note: '',
+        sortOrder: 0
+      };
+    });
+
+    Object.keys(previousBudgetMap).concat(Object.keys(previousSettlementMap)).forEach(function(key) {
+      if (rowMap[key]) return;
+      const parts = key.split('|');
+      rowMap[key] = {
+        fiscalYear: fiscalYear,
+        type: parts[0] || '',
+        subjectCode: parts[1] || '',
+        subjectName: '',
+        initialBudget: 0,
+        revisedBudget: 0,
+        actualAmount: Number(currentActualMap[key] || 0),
+        previousBudgetAmount: Number(previousBudgetMap[key] || 0),
+        previousSettlementAmount: Number(previousSettlementMap[key] || 0),
+        note: '',
+        sortOrder: 0
+      };
+    });
+
+    state.budgetRows = Object.values(rowMap).filter(function(row) {
+      return row.subjectCode || row.subjectName;
+    }).sort(function(a, b) {
+      const typeOrder = { '収入': 0, '支出': 1 };
+      const aType = Object.prototype.hasOwnProperty.call(typeOrder, a.type) ? typeOrder[a.type] : 9;
+      const bType = Object.prototype.hasOwnProperty.call(typeOrder, b.type) ? typeOrder[b.type] : 9;
+      if (aType !== bType) return aType - bType;
+      const sortComp = Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+      if (sortComp !== 0) return sortComp;
+      return String(a.subjectCode || '').localeCompare(String(b.subjectCode || ''), 'ja');
+    });
+
+    const previousIncomeTotal = previousIncomes.reduce(function(sum, row) { return sum + Number(row['収入金額'] || 0); }, 0);
+    const previousExpenseTotal = previousExpenses.reduce(function(sum, row) { return sum + Number(row['支出金額'] || 0); }, 0);
+    state.budgetPreviousSummary = {
+      incomeTotal: previousIncomeTotal,
+      expenseTotal: previousExpenseTotal,
+      balance: previousIncomeTotal - previousExpenseTotal
+    };
+
+    els.budgetFiscalYear.dataset.loadedValue = String(fiscalYear);
+    state.budgetInitialRows = clonePlain(state.budgetRows) || [];
+    state.budgetInitialSummary = clonePlain(state.budgetPreviousSummary) || { incomeTotal: 0, expenseTotal: 0, balance: 0 };
+    renderBudgetTable();
+    setUnsavedBaseline('budget', getBudgetSnapshot());
+  } catch (error) {
+    state.budgetRows = [];
+    state.budgetPreviousSummary = { incomeTotal: 0, expenseTotal: 0, balance: 0 };
+    renderBudgetTable();
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+async function loadSettlementPage() {
+  if (!state.currentUser) return showUserSelectScreen();
+  clearSettlementPdfResult();
+  showLoading('決算書を読み込んでいます...');
+  try {
+    const fiscalYear = Number(requireValue((els.settlementFiscalYear && els.settlementFiscalYear.value) || state.currentFiscalYear, '年度を選択してください'));
+    const result = await apiGet('accounting/buildSettlementSummary', { fiscalYear: fiscalYear });
+    state.settlementRows = result.summary || [];
+    renderSettlementTable();
+    if (els.settlementIncomeTotal) els.settlementIncomeTotal.textContent = formatCurrency(result.incomeTotal || 0);
+    if (els.settlementExpenseTotal) els.settlementExpenseTotal.textContent = formatCurrency(result.expenseTotal || 0);
+    if (els.settlementBalanceTotal) els.settlementBalanceTotal.textContent = formatCurrency(result.balance || 0);
+  } catch (error) {
+    state.settlementRows = [];
+    renderSettlementTable();
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function renderSettlementTable() {
+  if (!els.settlementTableBody) return;
+  const rows = state.settlementRows || [];
+  if (els.settlementCountLabel) els.settlementCountLabel.textContent = `${rows.length}件`;
+  if (!rows.length) {
+    els.settlementTableBody.innerHTML = '<tr><td colspan="7" class="empty-cell">該当する決算データがありません。</td></tr>';
+    return;
+  }
+  const sections = ['収入', '支出'];
+  const html = [];
+  sections.forEach(function(section) {
+    const sectionRows = rows.filter(function(row) { return row.type === section; });
+    if (!sectionRows.length) return;
+    html.push(`<tr class="settlement-section-row"><td colspan="7">${escapeHtml(section)}の部</td></tr>`);
+    sectionRows.forEach(function(row) {
+      html.push(`
+        <tr>
+          <td>${escapeHtml(row.type || '')}</td>
+          <td>${escapeHtml(row.subjectCode || '')}</td>
+          <td>${escapeHtml(row.subjectName || '')}</td>
+          <td class="text-right">${escapeHtml(formatNumber(row.budgetAmount || 0))}</td>
+          <td class="text-right">${escapeHtml(formatNumber(row.actualAmount || 0))}</td>
+          <td class="text-right">${escapeHtml(formatNumber(row.diffAmount || 0))}</td>
+          <td>${escapeHtml(row.note || '')}</td>
+        </tr>
+      `);
+    });
+    const totalBudget = sectionRows.reduce(function(sum, row) { return sum + Number(row.budgetAmount || 0); }, 0);
+    const totalActual = sectionRows.reduce(function(sum, row) { return sum + Number(row.actualAmount || 0); }, 0);
+    const totalDiff = sectionRows.reduce(function(sum, row) { return sum + Number(row.diffAmount || 0); }, 0);
+    html.push(`
+      <tr class="settlement-total-row">
+        <td colspan="3">${escapeHtml(section)}合計</td>
+        <td class="text-right">${escapeHtml(formatNumber(totalBudget))}</td>
+        <td class="text-right">${escapeHtml(formatNumber(totalActual))}</td>
+        <td class="text-right">${escapeHtml(formatNumber(totalDiff))}</td>
+        <td></td>
+      </tr>
+    `);
+  });
+  els.settlementTableBody.innerHTML = html.join('');
+}
+
+function clearSettlementPdfResult() {
+  if (state.settlementPdfBlobUrl) {
+    URL.revokeObjectURL(state.settlementPdfBlobUrl);
+    state.settlementPdfBlobUrl = '';
+  }
+  if (els.settlementPdfResult) {
+    els.settlementPdfResult.classList.add('hidden');
+    els.settlementPdfResult.innerHTML = '';
+  }
+}
+
+function renderSettlementPdfResult(result) {
+  if (!els.settlementPdfResult) return;
+  clearSettlementPdfResult();
+  state.settlementPdfBlobUrl = createBlobUrlFromBase64(result.pdfBase64, result.mimeType);
+  els.settlementPdfResult.classList.remove('hidden');
+  els.settlementPdfResult.innerHTML = `
+    <div class="pdf-title">決算書PDFを生成しました</div>
+    <div class="budget-pdf-result-meta">ファイル名: ${escapeHtml(result.fileName || '')}${result.createdAt ? ` / 生成日時: ${escapeHtml(result.createdAt)}` : ''}</div>
+    <div class="pdf-links">
+      <a href="${escapeAttribute(state.settlementPdfBlobUrl)}" target="_blank" rel="noopener noreferrer">PDFを開く</a>
+      <a href="${escapeAttribute(state.settlementPdfBlobUrl)}" download="${escapeAttribute(result.fileName || 'settlement.pdf')}">PDFをダウンロード</a>
+    </div>
+    <div class="budget-pdf-result-note">PDFは一時生成です。画面を閉じるか再読み込みするとリンクは無効になります。</div>
+  `;
+  triggerFileDownload(state.settlementPdfBlobUrl, result.fileName || 'settlement.pdf');
+}
+
+async function generateSettlementPdf() {
+  if (!state.currentUser) return showToast('利用者を選択してください', 'error');
+  const fiscalYear = requireValue((els.settlementFiscalYear && els.settlementFiscalYear.value) || state.currentFiscalYear, '年度を選択してください');
+  clearSettlementPdfResult();
+  if (!window.confirm(`${fiscalYear}年度の決算書PDFを生成しますか？`)) return;
+  showLoading('決算書PDFを生成しています...');
+  try {
+    const result = await apiPost('accounting/exportSettlementSheet', {
+      currentUser: state.currentUser,
+      fiscalYear: Number(fiscalYear)
+    });
+    renderSettlementPdfResult(result);
+    showToast('決算書PDFを生成しました', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
