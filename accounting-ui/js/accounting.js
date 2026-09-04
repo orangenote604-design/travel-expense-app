@@ -353,7 +353,6 @@ function bindEvents() {
   els.reloadMembersButton.addEventListener('click', reloadMemberMaster);
   els.saveMemberOrderButton.addEventListener('click', saveMemberOrder);
   els.resetMemberOrderButton.addEventListener('click', resetMemberOrder);
-  els.memberSortOrder.addEventListener('change', renderMemberTable);
   els.memberKeyword.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
