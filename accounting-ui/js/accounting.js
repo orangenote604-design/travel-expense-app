@@ -3627,7 +3627,7 @@ state.csvImportLastResult = state.csvImportLastResult || null;
 state.csvImportObjectUrl = state.csvImportObjectUrl || '';
 state.csvExportObjectUrl = state.csvExportObjectUrl || '';
 
-const EXPENSE_IMPORT_TEMPLATE_HEADERS = ['伝票番号','年度','科目コード','科目名','支出日','支出金額','摘要','備考','支払先','支払状況','支払日','関連旅費管理番号','登録日時','更新日時','登録者','更新者'];
+const EXPENSE_IMPORT_TEMPLATE_HEADERS = ['伝票番号','年度','科目コード','科目名','支出日','支出金額','摘要','備考','支払先','関連旅費管理番号','登録日時','更新日時','登録者','更新者'];
 const INCOME_IMPORT_TEMPLATE_HEADERS = ['伝票番号','年度','科目コード','科目名','収入日','収入金額','摘要','備考','入金元','入金確認状況','入金確認日','登録日時','更新日時','登録者','更新者'];
 
 const _cacheEnhancedElsForCsv_ = cacheEnhancedEls_;
@@ -3779,9 +3779,9 @@ function getCsvImportConfig_(kind) {
     return {
       title: '支出CSV取込',
       lead: '過去の支出データを CSV で一括取り込みできます。伝票番号は空欄なら自動採番、入力済みなら重複チェックを行います。',
-      required: ['年度', '科目コード', '支出日', '支出金額', '摘要', '支払先'],
-      optional: ['伝票番号', '科目名', '備考', '支払状況', '支払日', '関連旅費管理番号', '登録日時', '更新日時', '登録者', '更新者'],
-      hint: '文字コードは UTF-8（BOM付き推奨）。科目名が空欄でも、科目コードが一致すればマスタから補完します。',
+      required: ['年度', '科目名 または 科目コード', '支出日', '支出金額', '摘要'],
+      optional: ['伝票番号', '科目コード', '科目名', '支払先', '関連旅費管理番号', '登録日時', '更新日時', '登録者', '更新者'],
+      hint: '文字コードは UTF-8（BOM付き推奨）。支出先は空欄でも取り込めます。支払状況・支払日はCSVになくてもよく、科目コードが空欄でも既存判定または新規科目自動作成を行います。',
       templateName: 'expense_import_template.csv',
       action: 'accounting/importExpenseCsv',
       refresh: function() { return loadExpenseList(); }
@@ -3790,9 +3790,9 @@ function getCsvImportConfig_(kind) {
   return {
     title: '収入CSV取込',
     lead: '過去の収入データを CSV で一括取り込みできます。伝票番号は空欄なら自動採番、入力済みなら重複チェックを行います。',
-    required: ['年度', '科目コード', '収入日', '収入金額', '摘要', '入金元'],
-    optional: ['伝票番号', '科目名', '備考', '入金確認状況', '入金確認日', '登録日時', '更新日時', '登録者', '更新者'],
-    hint: '文字コードは UTF-8（BOM付き推奨）。科目名が空欄でも、科目コードが一致すればマスタから補完します。',
+    required: ['年度', '科目名 または 科目コード', '収入日', '収入金額', '摘要', '入金元'],
+    optional: ['伝票番号', '科目コード', '科目名', '入金確認状況', '入金確認日', '登録日時', '更新日時', '登録者', '更新者'],
+    hint: '文字コードは UTF-8（BOM付き推奨）。入金確認状況・入金確認日は省略できます。科目コードが空欄でも既存判定または新規科目自動作成を行います。',
     templateName: 'income_import_template.csv',
     action: 'accounting/importIncomeCsv',
     refresh: function() { return loadIncomeList(); }
@@ -3836,16 +3836,25 @@ function buildCsvText_(rows) {
 }
 
 function buildExpenseTemplateRows_() {
+  const fiscalYear = Number(state.currentFiscalYear || getCurrentFiscalYear_());
+  const previousFiscalYear = fiscalYear - 1;
   return [
     EXPENSE_IMPORT_TEMPLATE_HEADERS,
-    ['', Number(state.currentFiscalYear || getCurrentFiscalYear_()), 'EXP001', '旅費交通費', '2026/09/15', '12000', '遠征バス代', '', '株式会社サンプル', '支払済', '2026/09/20', '', '', '', '', '']
+    ['', fiscalYear, '', '旅費交通費', '2026/09/15', '12000', '遠征バス代', '秋季大会遠征', '', '', '', '', '', ''],
+    ['', fiscalYear, 'EXP002', '', '2026/08/28', '18500', 'ボール・ライン用品購入', '練習用備品の補充', '', '', '', '', '', ''],
+    ['', previousFiscalYear, '', '新設科目サンプル', '2025/11/05', '3200', '氷・飲料購入', '科目コード空欄でも自動作成確認用', '', '', '', '', '', '']
   ];
 }
 
 function buildIncomeTemplateRows_() {
+  const fiscalYear = Number(state.currentFiscalYear || getCurrentFiscalYear_());
+  const previousFiscalYear = fiscalYear - 1;
   return [
     INCOME_IMPORT_TEMPLATE_HEADERS,
-    ['', Number(state.currentFiscalYear || getCurrentFiscalYear_()), 'INC001', '部費収入', '2026/09/10', '30000', '9月分部費', '', '3年生部員一同', '確認済', '2026/09/10', '', '', '', '']
+    ['', fiscalYear, 'INC001', '部費収入', '2026/09/10', '30000', '9月分部費', '3年生分', '3年生部員一同', '確認済', '2026/09/10', '', '', '', ''],
+    ['', fiscalYear, 'INC002', '補助金収入', '2026/08/05', '50000', '市補助金入金', '前期分', '宍粟市スポーツ振興課', '確認済', '2026/08/05', '', '', '', ''],
+    ['', fiscalYear, 'INC003', '寄付金収入', '2026/07/18', '10000', 'OB会寄付', '夏大会激励金', '宍粟市野球部OB会', '確認済', '2026/07/18', '', '', '', ''],
+    ['', previousFiscalYear, 'INC004', '雑収入', '2025/12/01', '4500', '自販機売上精算', '11月分', '球場売店', '未確認', '', '', '', '', '']
   ];
 }
 
