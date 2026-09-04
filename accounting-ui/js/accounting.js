@@ -1,7 +1,7 @@
 const APP_CONFIG = {
   // 既存旅費申請システムで使用しているGASの実行URLを設定してください
-  // 例: https://script.google.com/macros/s/AKfycbzZOyswZ9GJ_40z5aPKF_VUJC4Aw-1x-EwXA5vYwAlFvpgwwEKZrhu8qzhaxyhUL2Tt/exec
-  apiBaseUrl: 'https://script.google.com/macros/s/AKfycbzZOyswZ9GJ_40z5aPKF_VUJC4Aw-1x-EwXA5vYwAlFvpgwwEKZrhu8qzhaxyhUL2Tt/exec'
+  // 例: https://script.google.com/macros/s/AKfycby9-98cUHI-ijuhqCqg2fEl3WhVdPOo7dPgOsOyahFduaBKt9pDgmLvCvZNyVTHv7k4/exec
+  apiBaseUrl: 'https://script.google.com/macros/s/AKfycby9-98cUHI-ijuhqCqg2fEl3WhVdPOo7dPgOsOyahFduaBKt9pDgmLvCvZNyVTHv7k4/exec'
 };
 
 const storageKeys = {
@@ -1631,8 +1631,8 @@ function buildExpenseDataFromForm() {
     summary: summary,
     note: els.formNote.value.trim(),
     payee: payee,
-    paymentStatus: '支払済',
-    paymentDate: expenseDate,
+    paymentStatus: '',
+    paymentDate: '',
     relatedTravelControlNo: els.formRelatedTravelControlNo.value.trim()
   };
 }
