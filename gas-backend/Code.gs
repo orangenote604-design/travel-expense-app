@@ -654,6 +654,36 @@ function deleteMember(name) {
   return { ok: true };
 }
 
+function reorderMembers(orderedNames) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MEMBER_SHEET_NAME);
+  const currentMembers = listMembers();
+  const names = Array.isArray(orderedNames) ? orderedNames.map(function(name) {
+    return trim_(name);
+  }).filter(function(name) {
+    return name !== '';
+  }) : [];
+
+  if (!names.length) return { ok: false, error: '並び替え対象の部員がありません' };
+
+  const uniqueNames = Array.from(new Set(names));
+  if (uniqueNames.length !== names.length) return { ok: false, error: '重複した部員名は並び替えできません' };
+  if (currentMembers.length !== names.length) return { ok: false, error: '部員一覧が最新ではありません。再読み込みしてからやり直してください' };
+
+  const hasMissing = currentMembers.some(function(name) { return names.indexOf(name) === -1; });
+  const hasUnknown = names.some(function(name) { return currentMembers.indexOf(name) === -1; });
+  if (hasMissing || hasUnknown) return { ok: false, error: '部員一覧が最新ではありません。再読み込みしてからやり直してください' };
+
+  const requiredRows = names.length + 1;
+  if (sheet.getMaxRows() < requiredRows) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), requiredRows - sheet.getMaxRows());
+  }
+  const clearCount = Math.max(sheet.getMaxRows() - 1, 1);
+  sheet.getRange(2, 1, clearCount, 1).clearContent();
+  sheet.getRange(2, 1, names.length, 1).setValues(names.map(function(name) { return [name]; }));
+  SpreadsheetApp.flush();
+  return { ok: true, count: names.length };
+}
+
 function listTrips() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TRIP_SHEET_NAME);
   const maxRows = sheet.getMaxRows();
@@ -1170,6 +1200,7 @@ function doPost(e) {
       case 'member/createFromAccounting': return outputJson_(createMemberFromAccounting_(payload));
       case 'member/updateFromAccounting': return outputJson_(updateMemberFromAccounting_(payload));
       case 'member/deleteFromAccounting': return outputJson_(deleteMemberFromAccounting_(payload));
+      case 'member/reorderFromAccounting': return outputJson_(reorderMembersFromAccounting_(payload));
 
       case 'accounting/createSubject': return outputJson_(createAccountingSubject_(payload));
       case 'accounting/updateSubject': return outputJson_(updateAccountingSubject_(payload));
@@ -2621,6 +2652,12 @@ function deleteMemberFromAccounting_(payload) {
   validateCurrentUser_(payload.currentUser);
   const name = trim_(payload.name || (payload.data && payload.data.name));
   return deleteMember(name);
+}
+
+function reorderMembersFromAccounting_(payload) {
+  validateCurrentUser_(payload.currentUser);
+  const names = payload.names || (payload.data && payload.data.names) || [];
+  return reorderMembers(names);
 }
 
 /*********************************
