@@ -3619,3 +3619,380 @@ async function generateSettlementPdf() {
     hideLoading();
   }
 }
+
+
+/* === CSV import/export enhancement block === */
+state.csvImportKind = state.csvImportKind || '';
+state.csvImportLastResult = state.csvImportLastResult || null;
+state.csvImportObjectUrl = state.csvImportObjectUrl || '';
+state.csvExportObjectUrl = state.csvExportObjectUrl || '';
+
+const EXPENSE_IMPORT_TEMPLATE_HEADERS = ['伝票番号','年度','科目コード','科目名','支出日','支出金額','摘要','備考','支払先','支払状況','支払日','関連旅費管理番号','登録日時','更新日時','登録者','更新者'];
+const INCOME_IMPORT_TEMPLATE_HEADERS = ['伝票番号','年度','科目コード','科目名','収入日','収入金額','摘要','備考','入金元','入金確認状況','入金確認日','登録日時','更新日時','登録者','更新者'];
+
+const _cacheEnhancedElsForCsv_ = cacheEnhancedEls_;
+cacheEnhancedEls_ = function() {
+  if (typeof _cacheEnhancedElsForCsv_ === 'function') _cacheEnhancedElsForCsv_();
+  Object.assign(els, {
+    exportExpenseCsvButton: document.getElementById('exportExpenseCsvButton'),
+    openExpenseCsvImportButton: document.getElementById('openExpenseCsvImportButton'),
+    downloadExpenseTemplateButton: document.getElementById('downloadExpenseTemplateButton'),
+    exportIncomeCsvButton: document.getElementById('exportIncomeCsvButton'),
+    openIncomeCsvImportButton: document.getElementById('openIncomeCsvImportButton'),
+    downloadIncomeTemplateButton: document.getElementById('downloadIncomeTemplateButton'),
+    csvImportModal: document.getElementById('csvImportModal'),
+    csvImportTitle: document.getElementById('csvImportTitle'),
+    csvImportLead: document.getElementById('csvImportLead'),
+    csvImportRequiredColumns: document.getElementById('csvImportRequiredColumns'),
+    csvImportOptionalColumns: document.getElementById('csvImportOptionalColumns'),
+    csvImportTemplateHint: document.getElementById('csvImportTemplateHint'),
+    csvImportFile: document.getElementById('csvImportFile'),
+    csvImportFileName: document.getElementById('csvImportFileName'),
+    csvImportExecuteButton: document.getElementById('csvImportExecuteButton'),
+    csvImportResult: document.getElementById('csvImportResult')
+  });
+};
+
+const _ensureEnhancedLayoutForCsv_ = ensureEnhancedLayout_;
+ensureEnhancedLayout_ = function() {
+  if (typeof _ensureEnhancedLayoutForCsv_ === 'function') _ensureEnhancedLayoutForCsv_();
+  ensureCsvFeatureLayout_();
+  cacheEnhancedEls_();
+};
+
+const _bindEventsForCsv_ = bindEvents;
+bindEvents = function() {
+  if (typeof _bindEventsForCsv_ === 'function') _bindEventsForCsv_();
+  bindCsvFeatureEvents_();
+};
+
+function ensureCsvFeatureLayout_() {
+  ensureExpenseCsvActions_();
+  ensureIncomeCsvActions_();
+  ensureCsvImportModal_();
+}
+
+function ensureExpenseCsvActions_() {
+  const actions = document.querySelector('#page-expenses .page-actions');
+  if (!actions || document.getElementById('exportExpenseCsvButton')) return;
+  actions.insertAdjacentHTML('beforeend', `
+    <div class="csv-action-group">
+      <button id="exportExpenseCsvButton" class="button secondary" type="button">CSV出力</button>
+      <button id="openExpenseCsvImportButton" class="button warning" type="button">CSV取込</button>
+      <button id="downloadExpenseTemplateButton" class="button secondary" type="button">テンプレートCSV</button>
+    </div>
+  `);
+}
+
+function ensureIncomeCsvActions_() {
+  const actions = document.querySelector('#page-incomes .page-actions');
+  if (!actions || document.getElementById('exportIncomeCsvButton')) return;
+  actions.insertAdjacentHTML('beforeend', `
+    <div class="csv-action-group">
+      <button id="exportIncomeCsvButton" class="button secondary" type="button">CSV出力</button>
+      <button id="openIncomeCsvImportButton" class="button warning" type="button">CSV取込</button>
+      <button id="downloadIncomeTemplateButton" class="button secondary" type="button">テンプレートCSV</button>
+    </div>
+  `);
+}
+
+function ensureCsvImportModal_() {
+  if (document.getElementById('csvImportModal')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="csvImportModal" class="modal hidden">
+      <div class="modal-backdrop" data-close-modal="csvImportModal"></div>
+      <div class="modal-dialog wide-dialog">
+        <div class="modal-header">
+          <h3 id="csvImportTitle">CSV取込</h3>
+          <button class="icon-button" type="button" data-close-modal="csvImportModal">×</button>
+        </div>
+        <div class="modal-body csv-import-modal-body">
+          <p id="csvImportLead" class="inline-note modal-note">CSVファイルを選択して取り込みます。</p>
+          <div class="csv-guide-grid">
+            <div class="card csv-guide-card">
+              <div class="card-title">必須列</div>
+              <div id="csvImportRequiredColumns" class="csv-column-chips"></div>
+            </div>
+            <div class="card csv-guide-card">
+              <div class="card-title">任意列</div>
+              <div id="csvImportOptionalColumns" class="csv-column-chips"></div>
+            </div>
+          </div>
+          <div class="csv-template-hint" id="csvImportTemplateHint"></div>
+          <div class="form-grid single-form-grid compact-modal-grid">
+            <label class="field required-field">
+              <span>CSVファイル</span>
+              <input type="file" id="csvImportFile" accept=".csv,text/csv" />
+            </label>
+          </div>
+          <div id="csvImportFileName" class="inline-note">未選択</div>
+          <div class="form-footer button-row wrap-actions modal-footer-actions">
+            <button id="csvImportExecuteButton" class="button success" type="button">取込実行</button>
+          </div>
+          <div id="csvImportResult" class="csv-import-result hidden"></div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function bindCsvFeatureEvents_() {
+  if (els.exportExpenseCsvButton && !els.exportExpenseCsvButton.dataset.bound) {
+    els.exportExpenseCsvButton.dataset.bound = '1';
+    els.exportExpenseCsvButton.addEventListener('click', function() { exportAccountingCsv_('expense'); });
+  }
+  if (els.openExpenseCsvImportButton && !els.openExpenseCsvImportButton.dataset.bound) {
+    els.openExpenseCsvImportButton.dataset.bound = '1';
+    els.openExpenseCsvImportButton.addEventListener('click', function() { openCsvImportModal_('expense'); });
+  }
+  if (els.downloadExpenseTemplateButton && !els.downloadExpenseTemplateButton.dataset.bound) {
+    els.downloadExpenseTemplateButton.dataset.bound = '1';
+    els.downloadExpenseTemplateButton.addEventListener('click', function() { downloadImportTemplateCsv_('expense'); });
+  }
+  if (els.exportIncomeCsvButton && !els.exportIncomeCsvButton.dataset.bound) {
+    els.exportIncomeCsvButton.dataset.bound = '1';
+    els.exportIncomeCsvButton.addEventListener('click', function() { exportAccountingCsv_('income'); });
+  }
+  if (els.openIncomeCsvImportButton && !els.openIncomeCsvImportButton.dataset.bound) {
+    els.openIncomeCsvImportButton.dataset.bound = '1';
+    els.openIncomeCsvImportButton.addEventListener('click', function() { openCsvImportModal_('income'); });
+  }
+  if (els.downloadIncomeTemplateButton && !els.downloadIncomeTemplateButton.dataset.bound) {
+    els.downloadIncomeTemplateButton.dataset.bound = '1';
+    els.downloadIncomeTemplateButton.addEventListener('click', function() { downloadImportTemplateCsv_('income'); });
+  }
+  if (els.csvImportFile && !els.csvImportFile.dataset.bound) {
+    els.csvImportFile.dataset.bound = '1';
+    els.csvImportFile.addEventListener('change', function() {
+      const file = els.csvImportFile.files && els.csvImportFile.files[0];
+      if (els.csvImportFileName) els.csvImportFileName.textContent = file ? `${file.name} / ${formatFileSize(file.size)}` : '未選択';
+    });
+  }
+  if (els.csvImportExecuteButton && !els.csvImportExecuteButton.dataset.bound) {
+    els.csvImportExecuteButton.dataset.bound = '1';
+    els.csvImportExecuteButton.addEventListener('click', executeCsvImport_);
+  }
+}
+
+function getCsvImportConfig_(kind) {
+  if (kind === 'expense') {
+    return {
+      title: '支出CSV取込',
+      lead: '過去の支出データを CSV で一括取り込みできます。伝票番号は空欄なら自動採番、入力済みなら重複チェックを行います。',
+      required: ['年度', '科目コード', '支出日', '支出金額', '摘要', '支払先'],
+      optional: ['伝票番号', '科目名', '備考', '支払状況', '支払日', '関連旅費管理番号', '登録日時', '更新日時', '登録者', '更新者'],
+      hint: '文字コードは UTF-8（BOM付き推奨）。科目名が空欄でも、科目コードが一致すればマスタから補完します。',
+      templateName: 'expense_import_template.csv',
+      action: 'accounting/importExpenseCsv',
+      refresh: function() { return loadExpenseList(); }
+    };
+  }
+  return {
+    title: '収入CSV取込',
+    lead: '過去の収入データを CSV で一括取り込みできます。伝票番号は空欄なら自動採番、入力済みなら重複チェックを行います。',
+    required: ['年度', '科目コード', '収入日', '収入金額', '摘要', '入金元'],
+    optional: ['伝票番号', '科目名', '備考', '入金確認状況', '入金確認日', '登録日時', '更新日時', '登録者', '更新者'],
+    hint: '文字コードは UTF-8（BOM付き推奨）。科目名が空欄でも、科目コードが一致すればマスタから補完します。',
+    templateName: 'income_import_template.csv',
+    action: 'accounting/importIncomeCsv',
+    refresh: function() { return loadIncomeList(); }
+  };
+}
+
+function renderColumnChips_(container, columns) {
+  if (!container) return;
+  container.innerHTML = (columns || []).map(function(name) {
+    return `<span class="csv-chip">${escapeHtml(name)}</span>`;
+  }).join('');
+}
+
+function openCsvImportModal_(kind) {
+  state.csvImportKind = kind;
+  state.csvImportLastResult = null;
+  const config = getCsvImportConfig_(kind);
+  if (els.csvImportTitle) els.csvImportTitle.textContent = config.title;
+  if (els.csvImportLead) els.csvImportLead.textContent = config.lead;
+  renderColumnChips_(els.csvImportRequiredColumns, config.required);
+  renderColumnChips_(els.csvImportOptionalColumns, config.optional);
+  if (els.csvImportTemplateHint) {
+    els.csvImportTemplateHint.innerHTML = `<div class="inline-note">${escapeHtml(config.hint)}<br>同梱テンプレート: <strong>${escapeHtml(config.templateName)}</strong></div>`;
+  }
+  if (els.csvImportFile) els.csvImportFile.value = '';
+  if (els.csvImportFileName) els.csvImportFileName.textContent = '未選択';
+  if (els.csvImportResult) {
+    els.csvImportResult.classList.add('hidden');
+    els.csvImportResult.innerHTML = '';
+  }
+  openModal('csvImportModal');
+}
+
+function buildCsvText_(rows) {
+  return '\ufeff' + (rows || []).map(function(row) {
+    return (row || []).map(function(value) {
+      const text = String(value === undefined || value === null ? '' : value).replace(/"/g, '""');
+      return /[",\r\n]/.test(text) ? `"${text}"` : text;
+    }).join(',');
+  }).join('\r\n') + '\r\n';
+}
+
+function buildExpenseTemplateRows_() {
+  return [
+    EXPENSE_IMPORT_TEMPLATE_HEADERS,
+    ['', Number(state.currentFiscalYear || getCurrentFiscalYear_()), 'EXP001', '旅費交通費', '2026/09/15', '12000', '遠征バス代', '', '株式会社サンプル', '支払済', '2026/09/20', '', '', '', '', '']
+  ];
+}
+
+function buildIncomeTemplateRows_() {
+  return [
+    INCOME_IMPORT_TEMPLATE_HEADERS,
+    ['', Number(state.currentFiscalYear || getCurrentFiscalYear_()), 'INC001', '部費収入', '2026/09/10', '30000', '9月分部費', '', '3年生部員一同', '確認済', '2026/09/10', '', '', '', '']
+  ];
+}
+
+function downloadImportTemplateCsv_(kind) {
+  const rows = kind === 'expense' ? buildExpenseTemplateRows_() : buildIncomeTemplateRows_();
+  const fileName = kind === 'expense' ? 'expense_import_template.csv' : 'income_import_template.csv';
+  triggerTextDownload_(buildCsvText_(rows), fileName, 'text/csv;charset=utf-8');
+  showToast('テンプレートCSVをダウンロードしました', 'success');
+}
+
+function revokeCsvObjectUrl_(key) {
+  if (state[key]) {
+    URL.revokeObjectURL(state[key]);
+    state[key] = '';
+  }
+}
+
+function triggerTextDownload_(text, fileName, mimeType) {
+  revokeCsvObjectUrl_('csvExportObjectUrl');
+  const blob = new Blob([text], { type: mimeType || 'text/plain;charset=utf-8' });
+  state.csvExportObjectUrl = URL.createObjectURL(blob);
+  triggerFileDownload(state.csvExportObjectUrl, fileName || 'download.txt');
+}
+
+async function exportAccountingCsv_(kind) {
+  const isExpense = kind === 'expense';
+  const fiscalYear = isExpense ? (els.expenseFiscalYear && els.expenseFiscalYear.value) : (els.incomeFiscalYear && els.incomeFiscalYear.value);
+  if (!fiscalYear) return showToast('年度を選択してください', 'error');
+  showLoading(isExpense ? '支出CSVを出力しています...' : '収入CSVを出力しています...');
+  try {
+    const result = await apiGet(isExpense ? 'accounting/exportExpenseCsv' : 'accounting/exportIncomeCsv', { fiscalYear: fiscalYear });
+    revokeCsvObjectUrl_('csvExportObjectUrl');
+    state.csvExportObjectUrl = createBlobUrlFromBase64(result.csvBase64, result.mimeType || 'text/csv');
+    triggerFileDownload(state.csvExportObjectUrl, result.fileName || (isExpense ? 'expense.csv' : 'income.csv'));
+    showToast(isExpense ? '支出CSVを出力しました' : '収入CSVを出力しました', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function readFileAsText_(file) {
+  return new Promise(function(resolve, reject) {
+    const reader = new FileReader();
+    reader.onload = function() { resolve(String(reader.result || '')); };
+    reader.onerror = function() { reject(new Error('CSVファイルの読み込みに失敗しました')); };
+    reader.readAsText(file, 'utf-8');
+  });
+}
+
+function renderCsvImportResult_(result) {
+  if (!els.csvImportResult) return;
+  const importedCount = Number(result.importedCount || 0);
+  const errorCount = Number(result.errorCount || 0);
+  const warningCount = Number(result.warningCount || 0);
+  const errorRows = result.errors || [];
+  const warningRows = result.warnings || [];
+
+  const errorTable = errorRows.length ? `
+    <div class="table-wrap csv-result-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>CSV行</th>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${errorRows.map(function(row) {
+            return `<tr><td>${escapeHtml(String(row.rowNumber || '-'))}</td><td>${escapeHtml(row.message || '')}</td></tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  ` : '<div class="inline-note">エラーはありません。</div>';
+
+  const warningTable = warningRows.length ? `
+    <div class="table-wrap csv-result-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>CSV行</th>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${warningRows.map(function(row) {
+            return `<tr><td>${escapeHtml(String(row.rowNumber || '-'))}</td><td>${escapeHtml(row.message || '')}</td></tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  ` : '<div class="inline-note">警告はありません。</div>';
+
+  els.csvImportResult.classList.remove('hidden');
+  els.csvImportResult.innerHTML = `
+    <div class="csv-result-summary">
+      <div class="csv-result-card success">
+        <div class="csv-result-label">取込成功</div>
+        <div class="csv-result-value">${escapeHtml(String(importedCount))}件</div>
+      </div>
+      <div class="csv-result-card warning">
+        <div class="csv-result-label">警告</div>
+        <div class="csv-result-value">${escapeHtml(String(warningCount))}件</div>
+      </div>
+      <div class="csv-result-card danger">
+        <div class="csv-result-label">エラー</div>
+        <div class="csv-result-value">${escapeHtml(String(errorCount))}件</div>
+      </div>
+    </div>
+    <div class="csv-result-block">
+      <div class="card-title">取込結果</div>
+      <div class="inline-note">${escapeHtml(result.message || '')}</div>
+    </div>
+    <div class="csv-result-block">
+      <div class="card-title">エラー一覧</div>
+      ${errorTable}
+    </div>
+    <div class="csv-result-block">
+      <div class="card-title">警告一覧</div>
+      ${warningTable}
+    </div>
+  `;
+}
+
+async function executeCsvImport_() {
+  if (!state.currentUser) return showToast('利用者を選択してください', 'error');
+  const config = getCsvImportConfig_(state.csvImportKind || 'expense');
+  const file = els.csvImportFile && els.csvImportFile.files ? els.csvImportFile.files[0] : null;
+  if (!file) return showToast('CSVファイルを選択してください', 'error');
+  showLoading('CSVを取り込んでいます...');
+  try {
+    const csvText = await readFileAsText_(file);
+    const result = await apiPost(config.action, {
+      currentUser: state.currentUser,
+      fileName: file.name,
+      csvText: csvText
+    });
+    state.csvImportLastResult = result;
+    renderCsvImportResult_(result);
+    await loadHomeSummary();
+    await config.refresh();
+    showToast(result.errorCount ? 'CSV取込が完了しました（一部エラーあり）' : 'CSV取込が完了しました', result.errorCount ? 'warning' : 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}

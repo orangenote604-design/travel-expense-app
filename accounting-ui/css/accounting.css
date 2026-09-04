@@ -1387,3 +1387,121 @@ body.fiscal-theme-future .site-header .button.secondary:hover:not(:disabled) {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* === CSV import/export enhancement block === */
+.csv-action-group {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.csv-import-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.csv-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.csv-guide-card {
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.csv-column-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.csv-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.csv-template-hint {
+  padding: 14px 16px;
+  border: 1px dashed #bfdbfe;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.csv-import-result {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 8px;
+}
+
+.csv-result-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.csv-result-card {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.csv-result-card.success {
+  background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);
+  border-color: #bbf7d0;
+}
+
+.csv-result-card.warning {
+  background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
+  border-color: #fdba74;
+}
+
+.csv-result-card.danger {
+  background: linear-gradient(180deg, #ffffff 0%, #fef2f2 100%);
+  border-color: #fecaca;
+}
+
+.csv-result-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.csv-result-value {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.csv-result-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.csv-result-table-wrap {
+  max-height: 260px;
+}
+
+@media (max-width: 900px) {
+  .csv-guide-grid,
+  .csv-result-summary {
+    grid-template-columns: 1fr;
+  }
+}
