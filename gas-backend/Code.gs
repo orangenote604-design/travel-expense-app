@@ -2722,3 +2722,573 @@ function ensureReceiptSheetInitialized_(ss) {
   return sheet;
 }
 
+
+
+/*********************************
+ * 会計年度・決算書強化オーバーライド
+ *********************************/
+function calcFiscalYear(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) throw new Error('旅費発生日が不正です');
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  return month >= 10 ? year : year - 1;
+}
+
+function getAccountingSubjectYearSettingSheetName_() {
+  return '科目年度設定';
+}
+
+function getAccountingSubjectYearSettingHeaders_() {
+  return ['年度', '科目コード', '表示順', '使用可否', '備考'];
+}
+
+function setupAccountingDatabase_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureAccountingSheetWithHeaders_(ss, ACCOUNTING_EXPENSE_SHEET_NAME, ACCOUNTING_EXPENSE_HEADERS);
+  ensureAccountingSheetWithHeaders_(ss, ACCOUNTING_INCOME_SHEET_NAME, ACCOUNTING_INCOME_HEADERS);
+  ensureAccountingSheetWithHeaders_(ss, ACCOUNTING_SUBJECT_SHEET_NAME, ACCOUNTING_SUBJECT_HEADERS);
+  ensureAccountingSheetWithHeaders_(ss, ACCOUNTING_BUDGET_SHEET_NAME, ACCOUNTING_BUDGET_HEADERS);
+  ensureAccountingSheetWithHeaders_(ss, ACCOUNTING_EVIDENCE_SHEET_NAME, ACCOUNTING_EVIDENCE_HEADERS);
+  ensureAccountingSheetWithHeaders_(ss, ACCOUNTING_CONFIG_SHEET_NAME, ACCOUNTING_CONFIG_HEADERS);
+  ensureAccountingSheetWithHeaders_(ss, ACCOUNTING_SETTLEMENT_OUTPUT_SHEET_NAME, ACCOUNTING_SETTLEMENT_HEADERS);
+  ensureAccountingSheetWithHeaders_(ss, getAccountingSubjectYearSettingSheetName_(), getAccountingSubjectYearSettingHeaders_());
+  ensureBudgetPdfSheetInitialized_(ss);
+  ensureSettlementPdfSheetInitialized_(ss);
+  seedAccountingConfig_();
+  seedAccountingSubjectsIfNeeded_();
+  seedAccountingSubjectYearSettingsIfNeeded_();
+  return { ok: true };
+}
+
+function ensureSettlementPdfSheetInitialized_(ss) {
+  const sheet = ensureSheet_(ss, ACCOUNTING_SETTLEMENT_OUTPUT_SHEET_NAME);
+  ensureSheetSize_(sheet, 140, 10);
+  return sheet;
+}
+
+function seedAccountingSubjectYearSettingsIfNeeded_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const settingSheet = ss.getSheetByName(getAccountingSubjectYearSettingSheetName_());
+  const existing = getSheetDataObjects_(settingSheet, getAccountingSubjectYearSettingHeaders_());
+  if (existing.length > 0) return;
+  const masterSheet = ss.getSheetByName(ACCOUNTING_SUBJECT_SHEET_NAME);
+  const masterRows = getSheetDataObjects_(masterSheet, ACCOUNTING_SUBJECT_HEADERS);
+  const currentFiscalYear = calcFiscalYear(new Date());
+  if (!masterRows.length) return;
+  const values = masterRows.map(function(row) {
+    return [
+      currentFiscalYear,
+      trim_(row['科目コード']),
+      toNumber_(row['表示順']),
+      String(row['使用可否']) !== 'false',
+      trim_(row['備考'])
+    ];
+  });
+  settingSheet.getRange(2, 1, values.length, values[0].length).setValues(values);
+}
+
+function buildAccountingSubjectYearSettingMap_(fiscalYear) {
+  const target = trim_(fiscalYear);
+  if (!target) return {};
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const settingSheet = ss.getSheetByName(getAccountingSubjectYearSettingSheetName_());
+  const rows = getSheetDataObjects_(settingSheet, getAccountingSubjectYearSettingHeaders_());
+  const map = {};
+  rows.forEach(function(row) {
+    if (String(row['年度']) !== target) return;
+    map[trim_(row['科目コード'])] = {
+      sortOrder: toNumber_(row['表示順']),
+      enabled: String(row['使用可否']) !== 'false',
+      note: trim_(row['備考'])
+    };
+  });
+  return map;
+}
+
+function upsertAccountingSubjectYearSetting_(fiscalYear, subjectCode, data) {
+  const year = Number(fiscalYear);
+  if (!year) return;
+  const code = trim_(subjectCode);
+  if (!code) return;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(getAccountingSubjectYearSettingSheetName_());
+  const rows = getSheetDataObjects_(sheet, getAccountingSubjectYearSettingHeaders_());
+  const key = String(year) + '|' + code;
+  let rowNumber = -1;
+  for (var i = 0; i < rows.length; i++) {
+    const rowKey = String(rows[i]['年度']) + '|' + trim_(rows[i]['科目コード']);
+    if (rowKey === key) {
+      rowNumber = i + 2;
+      break;
+    }
+  }
+  const values = [[
+    year,
+    code,
+    toNumber_(data.sortOrder),
+    data.enabled !== false,
+    trim_(data.note)
+  ]];
+  if (rowNumber >= 2) {
+    sheet.getRange(rowNumber, 1, 1, values[0].length).setValues(values);
+  } else {
+    const newRow = findFirstEmptyRowByColumn_(sheet, 1, 2);
+    sheet.getRange(newRow, 1, 1, values[0].length).setValues(values);
+  }
+}
+
+function removeAccountingSubjectYearSettings_(subjectCode) {
+  const code = trim_(subjectCode);
+  if (!code) return;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(getAccountingSubjectYearSettingSheetName_());
+  for (var row = sheet.getLastRow(); row >= 2; row--) {
+    if (trim_(sheet.getRange(row, 2).getValue()) === code) {
+      sheet.deleteRow(row);
+    }
+  }
+}
+
+function listAccountingSubjects_(params) {
+  const fiscalYear = trim_(params.fiscalYear);
+  const type = trim_(params.type);
+  const keyword = trim_(params.keyword);
+  const includeDisabled = normalizeBoolean_(params.includeDisabled);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(ACCOUNTING_SUBJECT_SHEET_NAME);
+  const yearMap = buildAccountingSubjectYearSettingMap_(fiscalYear);
+  const rows = getSheetDataObjects_(sheet, ACCOUNTING_SUBJECT_HEADERS).map(function(row) {
+    const code = trim_(row['科目コード']);
+    const yearSetting = yearMap[code] || null;
+    return {
+      '科目コード': code,
+      '科目名': trim_(row['科目名']),
+      '収支区分': trim_(row['収支区分']),
+      '表示順': yearSetting ? toNumber_(yearSetting.sortOrder) : toNumber_(row['表示順']),
+      '使用可否': yearSetting ? yearSetting.enabled : (String(row['使用可否']) !== 'false'),
+      '備考': yearSetting ? trim_(yearSetting.note) : trim_(row['備考'])
+    };
+  });
+
+  const items = rows.filter(function(row) {
+    if (type && trim_(row['収支区分']) !== type) return false;
+    if (!includeDisabled && String(row['使用可否']) === 'false') return false;
+    if (keyword) {
+      const joined = [row['科目コード'], row['科目名'], row['備考']].join(' ');
+      if (joined.indexOf(keyword) === -1) return false;
+    }
+    return true;
+  }).sort(function(a, b) {
+    const typeOrder = { '収入': 0, '支出': 1 };
+    const aType = Object.prototype.hasOwnProperty.call(typeOrder, a['収支区分']) ? typeOrder[a['収支区分']] : 9;
+    const bType = Object.prototype.hasOwnProperty.call(typeOrder, b['収支区分']) ? typeOrder[b['収支区分']] : 9;
+    if (aType !== bType) return aType - bType;
+    const sortComp = toNumber_(a['表示順']) - toNumber_(b['表示順']);
+    if (sortComp !== 0) return sortComp;
+    return String(a['科目コード'] || '').localeCompare(String(b['科目コード'] || ''), 'ja');
+  });
+  return { ok: true, subjects: items };
+}
+
+function createAccountingSubject_(payload) {
+  const currentUser = validateCurrentUser_(payload.currentUser);
+  const fiscalYear = Number(payload.fiscalYear || (payload.data && payload.data.fiscalYear));
+  const data = payload.data || {};
+  const subjectCode = trim_(data.subjectCode);
+  const subjectName = trim_(data.subjectName);
+  const type = trim_(data.type);
+  if (!subjectCode) throw new Error('科目コードは必須です');
+  if (!subjectName) throw new Error('科目名は必須です');
+  if (!type) throw new Error('収支区分は必須です');
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(ACCOUNTING_SUBJECT_SHEET_NAME);
+  const existsRow = findRowByColumnValue_(sheet, 1, subjectCode, 2);
+  if (existsRow >= 0) throw new Error('同じ科目コードが既に存在します');
+
+  const row = findFirstEmptyRowByColumn_(sheet, 1, 2);
+  sheet.getRange(row, 1, 1, ACCOUNTING_SUBJECT_HEADERS.length).setValues([[
+    subjectCode,
+    subjectName,
+    type,
+    toNumber_(data.sortOrder),
+    true,
+    ''
+  ]]);
+  upsertAccountingSubjectYearSetting_(fiscalYear, subjectCode, data);
+  return { ok: true, subjectCode: subjectCode, updatedBy: currentUser.name };
+}
+
+function updateAccountingSubject_(payload) {
+  const currentUser = validateCurrentUser_(payload.currentUser);
+  const subjectCode = trim_(payload.subjectCode);
+  const fiscalYear = Number(payload.fiscalYear || (payload.data && payload.data.fiscalYear));
+  const data = payload.data || {};
+  if (!subjectCode) throw new Error('科目コードが必要です');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(ACCOUNTING_SUBJECT_SHEET_NAME);
+  const row = findRowByColumnValue_(sheet, 1, subjectCode, 2);
+  if (row < 0) throw new Error('対象科目が見つかりません');
+  sheet.getRange(row, 2, 1, 5).setValues([[
+    trim_(data.subjectName),
+    trim_(data.type),
+    toNumber_(data.sortOrder),
+    true,
+    ''
+  ]]);
+  upsertAccountingSubjectYearSetting_(fiscalYear, subjectCode, data);
+  return { ok: true, subjectCode: subjectCode, updatedBy: currentUser.name };
+}
+
+function deleteAccountingSubject_(payload) {
+  const subjectCode = trim_(payload.subjectCode);
+  if (!subjectCode) throw new Error('科目コードが必要です');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(ACCOUNTING_SUBJECT_SHEET_NAME);
+  const row = findRowByColumnValue_(sheet, 1, subjectCode, 2);
+  if (row < 0) throw new Error('対象科目が見つかりません');
+  sheet.deleteRow(row);
+  removeAccountingSubjectYearSettings_(subjectCode);
+  return { ok: true, subjectCode: subjectCode };
+}
+
+function getBudgetSubjectMetaMap_(fiscalYear) {
+  const subjectRows = listAccountingSubjects_({ fiscalYear: String(fiscalYear || ''), includeDisabled: 'true' }).subjects || [];
+  const map = {};
+  subjectRows.forEach(function(row) {
+    const key = [trim_(row['収支区分']), trim_(row['科目コード'])].join('|');
+    map[key] = {
+      sortOrder: toNumber_(row['表示順']),
+      enabled: String(row['使用可否']) !== 'false',
+      subjectName: trim_(row['科目名']),
+      note: trim_(row['備考'])
+    };
+  });
+  return map;
+}
+
+function buildBudgetPdfData_(fiscalYear) {
+  const subjectMap = getBudgetSubjectMetaMap_(fiscalYear);
+  const budgetRows = listBudgetRows_({ fiscalYear: String(fiscalYear) }).rows || [];
+  var rows = [];
+  if (budgetRows.length) {
+    rows = budgetRows.map(function(row) {
+      const key = [trim_(row['収支区分']), trim_(row['科目コード'])].join('|');
+      const meta = subjectMap[key] || {};
+      const budgetAmount = toNumber_(row['当初予算額']) + toNumber_(row['補正予算額']) || toNumber_(row['予算合計額']);
+      return {
+        type: trim_(row['収支区分']),
+        subjectCode: trim_(row['科目コード']),
+        subjectName: trim_(row['科目名']) || meta.subjectName || '',
+        budgetAmount: budgetAmount,
+        note: trim_(row['備考']) || meta.note || '',
+        sortOrder: typeof meta.sortOrder === 'number' ? meta.sortOrder : 0,
+        enabled: meta.enabled !== false
+      };
+    }).filter(function(row) {
+      return row.enabled;
+    });
+  } else {
+    rows = Object.keys(subjectMap).map(function(key) {
+      const parts = key.split('|');
+      const meta = subjectMap[key];
+      return {
+        type: parts[0] || '',
+        subjectCode: parts[1] || '',
+        subjectName: meta.subjectName || '',
+        budgetAmount: 0,
+        note: meta.note || '',
+        sortOrder: meta.sortOrder || 0,
+        enabled: meta.enabled !== false
+      };
+    }).filter(function(row) { return row.enabled; });
+  }
+
+  rows.sort(function(a, b) {
+    const typeOrder = { '収入': 0, '支出': 1 };
+    const aType = Object.prototype.hasOwnProperty.call(typeOrder, a.type) ? typeOrder[a.type] : 9;
+    const bType = Object.prototype.hasOwnProperty.call(typeOrder, b.type) ? typeOrder[b.type] : 9;
+    if (aType !== bType) return aType - bType;
+    const aSort = Number(a.sortOrder || 0);
+    const bSort = Number(b.sortOrder || 0);
+    if (aSort !== bSort) return aSort - bSort;
+    return String(a.subjectCode || '').localeCompare(String(b.subjectCode || ''), 'ja');
+  });
+
+  const incomeRows = rows.filter(function(row) { return row.type === '収入'; });
+  const expenseRows = rows.filter(function(row) { return row.type === '支出'; });
+  const incomeTotal = incomeRows.reduce(function(sum, row) { return sum + toNumber_(row.budgetAmount); }, 0);
+  const expenseTotal = expenseRows.reduce(function(sum, row) { return sum + toNumber_(row.budgetAmount); }, 0);
+  return {
+    fiscalYear: Number(fiscalYear),
+    title: toJapaneseEraYearLabel_(fiscalYear) + ' 宍粟市野球部　一般会計予算書（案）',
+    incomeRows: incomeRows,
+    expenseRows: expenseRows,
+    incomeTotal: incomeTotal,
+    expenseTotal: expenseTotal,
+    balance: incomeTotal - expenseTotal,
+    outputDate: formatJapaneseEraDate_(new Date())
+  };
+}
+
+function buildSettlementSummary_(params) {
+  const fiscalYear = trim_(params.fiscalYear);
+  if (!fiscalYear) throw new Error('年度が必要です');
+  const expenses = listExpenseVouchers_({ fiscalYear: fiscalYear }).vouchers || [];
+  const incomes = listIncomeVouchers_({ fiscalYear: fiscalYear }).vouchers || [];
+  const budgets = listBudgetRows_({ fiscalYear: fiscalYear }).rows || [];
+  const subjects = listAccountingSubjects_({ fiscalYear: fiscalYear, includeDisabled: 'true' }).subjects || [];
+  const map = {};
+
+  subjects.forEach(function(subject) {
+    const key = [trim_(subject['収支区分']), trim_(subject['科目コード'])].join('|');
+    map[key] = {
+      fiscalYear: Number(fiscalYear),
+      type: trim_(subject['収支区分']),
+      subjectCode: trim_(subject['科目コード']),
+      subjectName: trim_(subject['科目名']),
+      budgetAmount: 0,
+      actualAmount: 0,
+      diffAmount: 0,
+      note: trim_(subject['備考']),
+      sortOrder: toNumber_(subject['表示順'])
+    };
+  });
+
+  budgets.forEach(function(row) {
+    const key = [trim_(row['収支区分']), trim_(row['科目コード'])].join('|');
+    if (!map[key]) {
+      map[key] = {
+        fiscalYear: Number(fiscalYear),
+        type: trim_(row['収支区分']),
+        subjectCode: trim_(row['科目コード']),
+        subjectName: trim_(row['科目名']),
+        budgetAmount: 0,
+        actualAmount: 0,
+        diffAmount: 0,
+        note: trim_(row['備考']),
+        sortOrder: 0
+      };
+    }
+    map[key].budgetAmount = toNumber_(row['予算合計額']) || toNumber_(row['当初予算額']) + toNumber_(row['補正予算額']);
+    if (!map[key].note) map[key].note = trim_(row['備考']);
+  });
+
+  expenses.forEach(function(row) {
+    const key = ['支出', trim_(row['科目コード'])].join('|');
+    if (!map[key]) {
+      map[key] = {
+        fiscalYear: Number(fiscalYear),
+        type: '支出',
+        subjectCode: trim_(row['科目コード']),
+        subjectName: trim_(row['科目名']),
+        budgetAmount: 0,
+        actualAmount: 0,
+        diffAmount: 0,
+        note: '',
+        sortOrder: 0
+      };
+    }
+    map[key].actualAmount += toNumber_(row['支出金額']);
+  });
+
+  incomes.forEach(function(row) {
+    const key = ['収入', trim_(row['科目コード'])].join('|');
+    if (!map[key]) {
+      map[key] = {
+        fiscalYear: Number(fiscalYear),
+        type: '収入',
+        subjectCode: trim_(row['科目コード']),
+        subjectName: trim_(row['科目名']),
+        budgetAmount: 0,
+        actualAmount: 0,
+        diffAmount: 0,
+        note: '',
+        sortOrder: 0
+      };
+    }
+    map[key].actualAmount += toNumber_(row['収入金額']);
+  });
+
+  const items = Object.keys(map).map(function(key) {
+    const item = map[key];
+    item.diffAmount = toNumber_(item.budgetAmount) - toNumber_(item.actualAmount);
+    return item;
+  }).sort(function(a, b) {
+    const typeOrder = { '収入': 0, '支出': 1 };
+    const aType = Object.prototype.hasOwnProperty.call(typeOrder, a.type) ? typeOrder[a.type] : 9;
+    const bType = Object.prototype.hasOwnProperty.call(typeOrder, b.type) ? typeOrder[b.type] : 9;
+    if (aType !== bType) return aType - bType;
+    const sortComp = toNumber_(a.sortOrder) - toNumber_(b.sortOrder);
+    if (sortComp !== 0) return sortComp;
+    return String(a.subjectCode || '').localeCompare(String(b.subjectCode || ''), 'ja');
+  });
+
+  const incomeTotal = incomes.reduce(function(sum, row) { return sum + toNumber_(row['収入金額']); }, 0);
+  const expenseTotal = expenses.reduce(function(sum, row) { return sum + toNumber_(row['支出金額']); }, 0);
+  return {
+    ok: true,
+    fiscalYear: Number(fiscalYear),
+    summary: items,
+    incomeTotal: incomeTotal,
+    expenseTotal: expenseTotal,
+    balance: incomeTotal - expenseTotal
+  };
+}
+
+function buildSettlementPdfData_(fiscalYear) {
+  const result = buildSettlementSummary_({ fiscalYear: String(fiscalYear) });
+  return {
+    fiscalYear: Number(fiscalYear),
+    title: toJapaneseEraYearLabel_(fiscalYear) + ' 宍粟市野球部　一般会計決算書',
+    incomeRows: (result.summary || []).filter(function(row) { return row.type === '収入'; }),
+    expenseRows: (result.summary || []).filter(function(row) { return row.type === '支出'; }),
+    incomeTotal: result.incomeTotal,
+    expenseTotal: result.expenseTotal,
+    balance: result.balance,
+    outputDate: formatJapaneseEraDate_(new Date())
+  };
+}
+
+function applySettlementTableSection_(sheet, startRow, title, rows, totalAmount) {
+  sheet.getRange(startRow, 1, 1, 10).merge();
+  sheet.getRange(startRow, 1).setValue(title).setFontWeight('bold').setFontSize(10).setHorizontalAlignment('left');
+  const headerRow = startRow + 1;
+  sheet.getRange(headerRow, 1, 1, 3).merge();
+  sheet.getRange(headerRow, 4, 1, 2).merge();
+  sheet.getRange(headerRow, 6, 1, 2).merge();
+  sheet.getRange(headerRow, 8, 1, 3).merge();
+  sheet.getRange(headerRow, 1).setValue('科　目');
+  sheet.getRange(headerRow, 4).setValue('予算額');
+  sheet.getRange(headerRow, 6).setValue('決算額');
+  sheet.getRange(headerRow, 8).setValue('備　考');
+  sheet.getRange(headerRow, 1, 1, 10)
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID);
+
+  var rowIndex = headerRow + 1;
+  rows.forEach(function(item, idx) {
+    sheet.getRange(rowIndex, 1, 1, 3).merge();
+    sheet.getRange(rowIndex, 4, 1, 2).merge();
+    sheet.getRange(rowIndex, 6, 1, 2).merge();
+    sheet.getRange(rowIndex, 8, 1, 3).merge();
+    sheet.getRange(rowIndex, 1).setValue((idx + 1) + '. ' + trim_(item.subjectName || item.subjectCode));
+    sheet.getRange(rowIndex, 4).setValue(toNumber_(item.budgetAmount));
+    sheet.getRange(rowIndex, 6).setValue(toNumber_(item.actualAmount));
+    sheet.getRange(rowIndex, 8).setValue(trim_(item.note));
+    sheet.getRange(rowIndex, 1, 1, 10)
+      .setVerticalAlignment('middle')
+      .setWrap(true)
+      .setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(rowIndex, 4, 1, 4).setNumberFormat('#,##0"円"');
+    sheet.getRange(rowIndex, 4).setHorizontalAlignment('right');
+    sheet.getRange(rowIndex, 6).setHorizontalAlignment('right');
+    sheet.getRange(rowIndex, 1).setHorizontalAlignment('left');
+    sheet.getRange(rowIndex, 8).setHorizontalAlignment('left');
+    sheet.setRowHeight(rowIndex, 28);
+    rowIndex += 1;
+  });
+
+  sheet.getRange(rowIndex, 1, 1, 3).merge();
+  sheet.getRange(rowIndex, 4, 1, 2).merge();
+  sheet.getRange(rowIndex, 6, 1, 2).merge();
+  sheet.getRange(rowIndex, 8, 1, 3).merge();
+  sheet.getRange(rowIndex, 1).setValue('合　計').setFontWeight('bold');
+  sheet.getRange(rowIndex, 6).setValue(totalAmount).setFontWeight('bold');
+  sheet.getRange(rowIndex, 1, 1, 10)
+    .setVerticalAlignment('middle')
+    .setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  sheet.getRange(rowIndex, 6).setNumberFormat('#,##0"円"').setHorizontalAlignment('right');
+  sheet.getRange(rowIndex, 1).setHorizontalAlignment('left');
+  sheet.setRowHeight(rowIndex, 28);
+  return rowIndex;
+}
+
+function writeSettlementPdfSheet_(sheet, data) {
+  ensureSheetSize_(sheet, 140, 10);
+  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).breakApart();
+  sheet.clear();
+  sheet.clearFormats();
+  sheet.clearConditionalFormatRules();
+  sheet.setHiddenGridlines(true);
+
+  const widths = [52, 52, 92, 72, 72, 72, 72, 92, 92, 92];
+  widths.forEach(function(width, index) { sheet.setColumnWidth(index + 1, width); });
+
+  sheet.getRange(2, 1, 1, 10).merge();
+  sheet.getRange(2, 1)
+    .setValue(data.title)
+    .setFontSize(14)
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(2, 30);
+
+  var lastIncomeRow = applySettlementTableSection_(sheet, 4, '【収入の部】', data.incomeRows, data.incomeTotal);
+  var expenseStartRow = lastIncomeRow + 2;
+  var lastExpenseRow = applySettlementTableSection_(sheet, expenseStartRow, '【支出の部】', data.expenseRows, data.expenseTotal);
+
+  var summaryStartRow = lastExpenseRow + 2;
+  var labels = ['収　入　額', '支　出　額', '差　引　額'];
+  var values = [data.incomeTotal, data.expenseTotal, data.balance];
+  for (var i = 0; i < labels.length; i++) {
+    var row = summaryStartRow + i;
+    sheet.getRange(row, 2, 1, 2).merge();
+    sheet.getRange(row, 4, 1, 2).merge();
+    sheet.getRange(row, 2).setValue(labels[i]).setFontWeight('bold').setHorizontalAlignment('center');
+    sheet.getRange(row, 4).setValue(values[i]).setNumberFormat('#,##0"円"').setHorizontalAlignment('right');
+    sheet.getRange(row, 2, 1, 4).setVerticalAlignment('middle');
+    sheet.setRowHeight(row, 24);
+  }
+  sheet.getRange(summaryStartRow + 2, 1, 1, 6).setBorder(false, false, true, false, false, false, '#000000', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+
+  var footerRow = summaryStartRow + 5;
+  sheet.getRange(footerRow, 1, 1, 4).merge();
+  sheet.getRange(footerRow, 1).setValue('上記のとおり報告いたします。').setHorizontalAlignment('left');
+  sheet.getRange(footerRow, 6, 1, 5).merge();
+  sheet.getRange(footerRow, 6).setValue(data.outputDate).setHorizontalAlignment('center');
+
+  sheet.getRange(footerRow + 1, 6, 1, 2).merge();
+  sheet.getRange(footerRow + 1, 6).setValue('監　督').setHorizontalAlignment('center');
+  sheet.getRange(footerRow + 1, 8, 1, 3).merge();
+  sheet.getRange(footerRow + 1, 8).setValue('　　　　　　　　　印').setHorizontalAlignment('left');
+
+  sheet.getRange(footerRow + 2, 6, 1, 2).merge();
+  sheet.getRange(footerRow + 2, 6).setValue('会　計').setHorizontalAlignment('center');
+  sheet.getRange(footerRow + 2, 8, 1, 3).merge();
+  sheet.getRange(footerRow + 2, 8).setValue('　　　　　　　　　印').setHorizontalAlignment('left');
+
+  sheet.getRange(footerRow + 3, 6, 1, 2).merge();
+  sheet.getRange(footerRow + 3, 6).setValue('監　査').setHorizontalAlignment('center');
+  sheet.getRange(footerRow + 3, 8, 1, 3).merge();
+  sheet.getRange(footerRow + 3, 8).setValue('　　　　　　　　　印').setHorizontalAlignment('left');
+
+  sheet.getRange(1, 1, footerRow + 3, 10).setFontSize(10).setFontFamily('Noto Sans JP');
+}
+
+function exportSettlementSheet_(payload) {
+  validateCurrentUser_(payload.currentUser);
+  const fiscalYear = Number(payload.fiscalYear);
+  if (!fiscalYear) throw new Error('年度が必要です');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ensureSettlementPdfSheetInitialized_(ss);
+  const data = buildSettlementPdfData_(fiscalYear);
+  writeSettlementPdfSheet_(sheet, data);
+  const timestamp = Utilities.formatDate(new Date(), APP_TIMEZONE, 'yyyyMMdd_HHmmss');
+  const fileName = '一般会計決算書_' + fiscalYear + '年度_' + timestamp + '.pdf';
+  const pdfBlob = exportBudgetSheetPdfBlob_(sheet, fileName);
+  return {
+    ok: true,
+    fiscalYear: fiscalYear,
+    fileName: fileName,
+    mimeType: 'application/pdf',
+    pdfBase64: Utilities.base64Encode(pdfBlob.getBytes()),
+    createdAt: nowString_(),
+    incomeTotal: data.incomeTotal,
+    expenseTotal: data.expenseTotal,
+    balance: data.balance
+  };
+}
