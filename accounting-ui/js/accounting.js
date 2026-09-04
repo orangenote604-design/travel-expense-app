@@ -2782,6 +2782,8 @@ function applyFiscalYearUi_() {
   const fiscalYear = Number(state.currentFiscalYear || getCurrentFiscalYear_());
   const status = getFiscalYearStatus_(fiscalYear);
   const className = `fiscal-year-badge fiscal-status-${status}`;
+  document.body.classList.remove('fiscal-theme-current', 'fiscal-theme-past', 'fiscal-theme-future');
+  document.body.classList.add(`fiscal-theme-${status}`);
   getManagedFiscalYearSelects_().forEach(function(select) {
     select.value = String(fiscalYear);
     select.classList.remove('fiscal-status-select-current', 'fiscal-status-select-past', 'fiscal-status-select-future');

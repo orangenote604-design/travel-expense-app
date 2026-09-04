@@ -1332,6 +1332,51 @@ td {
   margin-top: 10px;
 }
 
+body.fiscal-theme-current .site-header {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.96) 0%, rgba(219, 234, 254, 0.9) 100%);
+  border-bottom-color: #93c5fd;
+}
+
+body.fiscal-theme-past .site-header {
+  background: linear-gradient(180deg, rgba(255, 247, 237, 0.96) 0%, rgba(254, 215, 170, 0.88) 100%);
+  border-bottom-color: #fdba74;
+}
+
+body.fiscal-theme-future .site-header {
+  background: linear-gradient(180deg, rgba(236, 253, 245, 0.96) 0%, rgba(187, 247, 208, 0.88) 100%);
+  border-bottom-color: #86efac;
+}
+
+body.fiscal-theme-current .site-header .current-user-box,
+body.fiscal-theme-current .site-header .button.secondary {
+  background: linear-gradient(180deg, #ffffff 0%, #eff6ff 100%);
+  border-color: #93c5fd;
+}
+
+body.fiscal-theme-past .site-header .current-user-box,
+body.fiscal-theme-past .site-header .button.secondary {
+  background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
+  border-color: #fdba74;
+}
+
+body.fiscal-theme-future .site-header .current-user-box,
+body.fiscal-theme-future .site-header .button.secondary {
+  background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%);
+  border-color: #86efac;
+}
+
+body.fiscal-theme-current .site-header .button.secondary:hover:not(:disabled) {
+  background: #dbeafe;
+}
+
+body.fiscal-theme-past .site-header .button.secondary:hover:not(:disabled) {
+  background: #fed7aa;
+}
+
+body.fiscal-theme-future .site-header .button.secondary:hover:not(:disabled) {
+  background: #bbf7d0;
+}
+
 @media (max-width: 960px) {
   .header-actions,
   .current-user-box-group {
