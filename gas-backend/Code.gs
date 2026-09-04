@@ -3415,7 +3415,10 @@ function importExpenseCsv_(payload) {
     paymentDateKey: '支払日',
     extraKey: '関連旅費管理番号',
     defaultStatus: '未払',
-    typeValue: '支出'
+    typeValue: '支出',
+    requireCounterparty: false,
+    requiredHeaders: ['年度', '支出日', '支出金額', '摘要'],
+    atLeastOneHeaderGroups: [['科目コード', '科目名']]
   });
 }
 
@@ -3434,7 +3437,10 @@ function importIncomeCsv_(payload) {
     paymentDateKey: '入金確認日',
     extraKey: '',
     defaultStatus: '未確認',
-    typeValue: '収入'
+    typeValue: '収入',
+    requireCounterparty: true,
+    requiredHeaders: ['年度', '収入日', '収入金額', '摘要', '入金元'],
+    atLeastOneHeaderGroups: [['科目コード', '科目名']]
   });
 }
 
@@ -3446,15 +3452,18 @@ function importAccountingCsvCore_(payload, config) {
   const parsed = parseAccountingCsvText_(csvText);
   const headerRow = parsed.headers;
   const rows = parsed.rows;
-  const validate = validateCsvHeaders_(headerRow, config.headers);
-  if (validate.missing.length) {
-    throw new Error('CSVヘッダーが不足しています: ' + validate.missing.join(' / '));
+  const validate = validateCsvHeaders_(headerRow, config.requiredHeaders || config.headers, config.atLeastOneHeaderGroups || []);
+  if (validate.missing.length || validate.groupErrors.length) {
+    const messages = [];
+    if (validate.missing.length) messages.push('不足: ' + validate.missing.join(' / '));
+    if (validate.groupErrors.length) messages.push('いずれか必須: ' + validate.groupErrors.join(' / '));
+    throw new Error('CSVヘッダーが不足しています: ' + messages.join(' / '));
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(config.sheetName);
   const headerMap = getHeaderMap_(config.sheetHeaders);
-  const subjectMap = getSubjectCodeMap_(config.typeValue);
+  const subjectLookup = getSubjectLookupMaps_(config.typeValue);
   const existingVoucherNos = getExistingVoucherNoSet_(sheet, config.sheetHeaders);
   const fileVoucherNos = {};
   const results = [];
@@ -3468,10 +3477,16 @@ function importAccountingCsvCore_(payload, config) {
     if (isCsvRowEmpty_(rowObj)) return;
 
     try {
-      const normalized = normalizeImportRow_(rowObj, config, subjectMap, currentUser.name);
+      const normalized = normalizeImportRow_(rowObj, config, subjectLookup, currentUser.name);
       const voucherNo = normalizeVoucherNoForImport_(normalized.voucherNo, config.prefix, normalized.fiscalYear, sheet, fileVoucherNos, existingVoucherNos, rowNumber);
       const warningsForRow = [];
 
+      if (normalized.subjectResolution && normalized.subjectResolution.mode === 'matched_by_name') {
+        warningsForRow.push('科目コードが空欄のため、既存科目「' + normalized.subjectName + '」のコード ' + normalized.subjectCode + ' を自動採用しました');
+      }
+      if (normalized.subjectResolution && normalized.subjectResolution.mode === 'created_new') {
+        warningsForRow.push('未登録の科目名「' + normalized.subjectName + '」を検知したため、科目コード ' + normalized.subjectCode + ' で新規作成しました');
+      }
       if (normalized.subjectNameInput && normalized.subjectNameInput !== normalized.subjectName) {
         warningsForRow.push('科目名はマスタ値「' + normalized.subjectName + '」を採用しました');
       }
@@ -3520,11 +3535,18 @@ function parseAccountingCsvText_(csvText) {
   return { headers: headers, rows: body };
 }
 
-function validateCsvHeaders_(actualHeaders, expectedHeaders) {
+function validateCsvHeaders_(actualHeaders, expectedHeaders, atLeastOneHeaderGroups) {
   const missing = (expectedHeaders || []).filter(function(name) {
     return actualHeaders.indexOf(name) === -1;
   });
-  return { missing: missing };
+  const groupErrors = [];
+  (atLeastOneHeaderGroups || []).forEach(function(group) {
+    const exists = (group || []).some(function(name) {
+      return actualHeaders.indexOf(name) !== -1;
+    });
+    if (!exists) groupErrors.push((group || []).join(' または '));
+  });
+  return { missing: missing, groupErrors: groupErrors };
 }
 
 function mapCsvRowToObject_(headers, values) {
@@ -3541,17 +3563,23 @@ function isCsvRowEmpty_(rowObj) {
   });
 }
 
-function getSubjectCodeMap_(type) {
+function getSubjectLookupMaps_(type) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(ACCOUNTING_SUBJECT_SHEET_NAME);
   const rows = getSheetDataObjects_(sheet, ACCOUNTING_SUBJECT_HEADERS);
-  const map = {};
+  const codeMap = {};
+  const nameMap = {};
   rows.forEach(function(row) {
     if (trim_(row['収支区分']) !== type) return;
-    if (String(row['使用可否']) === 'false') return;
-    map[trim_(row['科目コード'])] = row;
+    const subjectCode = trim_(row['科目コード']);
+    const subjectName = trim_(row['科目名']);
+    if (subjectCode) codeMap[subjectCode] = row;
+    if (subjectName) {
+      if (!nameMap[subjectName]) nameMap[subjectName] = [];
+      nameMap[subjectName].push(row);
+    }
   });
-  return map;
+  return { codeMap: codeMap, nameMap: nameMap };
 }
 
 function getExistingVoucherNoSet_(sheet, headers) {
@@ -3563,28 +3591,29 @@ function getExistingVoucherNoSet_(sheet, headers) {
   return set;
 }
 
-function normalizeImportRow_(rowObj, config, subjectMap, currentUserName) {
+function normalizeImportRow_(rowObj, config, subjectLookup, currentUserName) {
   const fiscalYear = Number(trim_(rowObj['年度']));
-  const subjectCode = trim_(rowObj['科目コード']);
-  const subject = subjectMap[subjectCode];
+  const subjectCodeInput = trim_(rowObj['科目コード']);
+  const subjectNameInput = trim_(rowObj['科目名']);
   const dateValue = normalizeImportDateValue_(rowObj[config.dateKey], config.dateKey);
   const amount = toNumber_(rowObj[config.amountKey]);
   const summary = trim_(rowObj['摘要']);
   const counterparty = trim_(rowObj[config.counterpartyKey]);
   if (!fiscalYear) throw new Error('年度が不正です');
-  if (!subjectCode) throw new Error('科目コードが未入力です');
-  if (!subject) throw new Error('科目コード「' + subjectCode + '」が ' + config.label + '科目マスタに存在しません');
+  if (!subjectCodeInput && !subjectNameInput) throw new Error('科目コードまたは科目名のどちらかを入力してください');
   if (!dateValue) throw new Error(config.dateKey + ' が未入力です');
   if (amount <= 0) throw new Error(config.amountKey + ' は0より大きい値を入力してください');
   if (!summary) throw new Error('摘要が未入力です');
-  if (!counterparty) throw new Error(config.counterpartyKey + ' が未入力です');
+  if (config.requireCounterparty && !counterparty) throw new Error(config.counterpartyKey + ' が未入力です');
 
+  const subjectResolution = resolveSubjectForImport_(subjectCodeInput, subjectNameInput, config, subjectLookup, currentUserName);
   return {
     voucherNo: trim_(rowObj['伝票番号']),
     fiscalYear: fiscalYear,
-    subjectCode: subjectCode,
-    subjectName: trim_(subject['科目名']),
-    subjectNameInput: trim_(rowObj['科目名']),
+    subjectCode: subjectResolution.subjectCode,
+    subjectName: subjectResolution.subjectName,
+    subjectNameInput: subjectNameInput,
+    subjectResolution: subjectResolution,
     dateValue: dateValue,
     amount: amount,
     summary: summary,
@@ -3614,6 +3643,96 @@ function normalizeImportDateValue_(value, keyName) {
 function normalizeOptionalImportDateValue_(value) {
   const text = trim_(value);
   return text ? normalizeImportDateValue_(text, '日付') : '';
+}
+
+
+function resolveSubjectForImport_(subjectCodeInput, subjectNameInput, config, subjectLookup, currentUserName) {
+  const codeMap = subjectLookup && subjectLookup.codeMap ? subjectLookup.codeMap : {};
+  const nameMap = subjectLookup && subjectLookup.nameMap ? subjectLookup.nameMap : {};
+  const subjectCode = trim_(subjectCodeInput);
+  const subjectName = trim_(subjectNameInput);
+
+  if (subjectCode) {
+    const matchedByCode = codeMap[subjectCode];
+    if (!matchedByCode) throw new Error('科目コード「' + subjectCode + '」が ' + config.label + '科目マスタに存在しません');
+    return {
+      subjectCode: subjectCode,
+      subjectName: trim_(matchedByCode['科目名']),
+      mode: 'matched_by_code'
+    };
+  }
+
+  const matchedRows = nameMap[subjectName] || [];
+  if (matchedRows.length === 1) {
+    return {
+      subjectCode: trim_(matchedRows[0]['科目コード']),
+      subjectName: trim_(matchedRows[0]['科目名']),
+      mode: 'matched_by_name'
+    };
+  }
+  if (matchedRows.length > 1) {
+    throw new Error('科目名「' + subjectName + '」に一致する既存科目が複数あるため、自動判定できません。科目コードを指定してください');
+  }
+
+  const created = createAccountingSubjectFromImport_(subjectName, config.typeValue, currentUserName);
+  codeMap[created.subjectCode] = {
+    '科目コード': created.subjectCode,
+    '科目名': created.subjectName,
+    '収支区分': config.typeValue,
+    '表示順': created.sortOrder,
+    '使用可否': true,
+    '備考': created.note
+  };
+  nameMap[created.subjectName] = [codeMap[created.subjectCode]];
+  return {
+    subjectCode: created.subjectCode,
+    subjectName: created.subjectName,
+    mode: 'created_new'
+  };
+}
+
+function createAccountingSubjectFromImport_(subjectName, type, currentUserName) {
+  const name = trim_(subjectName);
+  if (!name) throw new Error('科目名が未入力です');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(ACCOUNTING_SUBJECT_SHEET_NAME);
+  const rows = getSheetDataObjects_(sheet, ACCOUNTING_SUBJECT_HEADERS);
+  const sameTypeRows = rows.filter(function(row) {
+    return trim_(row['収支区分']) === type;
+  });
+  const sortOrder = sameTypeRows.reduce(function(maxValue, row) {
+    return Math.max(maxValue, Number(row['表示順'] || 0));
+  }, 0) + 10;
+  const subjectCode = generateNextSubjectCodeForType_(type, rows);
+  const note = 'CSV取込で自動作成';
+  const row = findFirstEmptyRowByColumn_(sheet, 1, 2);
+  sheet.getRange(row, 1, 1, ACCOUNTING_SUBJECT_HEADERS.length).setValues([[
+    subjectCode,
+    name,
+    type,
+    sortOrder,
+    true,
+    note
+  ]]);
+  return {
+    subjectCode: subjectCode,
+    subjectName: name,
+    sortOrder: sortOrder,
+    note: note,
+    updatedBy: currentUserName || ''
+  };
+}
+
+function generateNextSubjectCodeForType_(type, rows) {
+  const prefix = type === '収入' ? 'INC' : 'EXP';
+  let maxSeq = 0;
+  (rows || []).forEach(function(row) {
+    if (trim_(row['収支区分']) !== type) return;
+    const code = trim_(row['科目コード']);
+    const match = code.match(new RegExp('^' + prefix + '(\\d+)$'));
+    if (match) maxSeq = Math.max(maxSeq, Number(match[1] || 0));
+  });
+  return prefix + ('000' + (maxSeq + 1)).slice(-3);
 }
 
 function normalizeVoucherNoForImport_(voucherNo, prefix, fiscalYear, sheet, fileVoucherNos, existingVoucherNos, rowNumber) {
