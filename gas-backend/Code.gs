@@ -3865,3 +3865,218 @@ function buildImportSheetRow_(voucherNo, normalized, config) {
     normalized.updatedBy
   ];
 }
+
+
+/* === settlement pdf enhancement v20260904 === */
+function buildSettlementOfficerDisplayName_(name) {
+  var value = trim_(name);
+  return value || '〇〇　〇〇';
+}
+
+function formatSettlementApprovalDate_(dateValue) {
+  var value = trim_(dateValue);
+  if (!value) return '令和　年　月　日';
+  return formatJapaneseEraDate_(value);
+}
+
+function applySettlementOverrideNotes_(rows, overrideRows) {
+  var noteMap = {};
+  (overrideRows || []).forEach(function(row) {
+    var key = [trim_(row.type), trim_(row.subjectCode)].join('|');
+    noteMap[key] = trim_(row.note);
+  });
+  return (rows || []).map(function(item) {
+    var cloned = JSON.parse(JSON.stringify(item));
+    var key = [trim_(cloned.type), trim_(cloned.subjectCode)].join('|');
+    if (Object.prototype.hasOwnProperty.call(noteMap, key)) cloned.note = noteMap[key];
+    return cloned;
+  });
+}
+
+function buildSettlementPdfData_(fiscalYear, options) {
+  var payload = options || {};
+  var result = buildSettlementSummary_({ fiscalYear: String(fiscalYear) });
+  var summaryRows = applySettlementOverrideNotes_(result.summary || [], payload.settlementRows || []);
+  var meta = payload.settlementMeta || {};
+  return {
+    fiscalYear: Number(fiscalYear),
+    title: toJapaneseEraYearLabel_(fiscalYear) + ' 宍粟市野球部　一般会計決算書',
+    incomeRows: summaryRows.filter(function(row) { return row.type === '収入'; }),
+    expenseRows: summaryRows.filter(function(row) { return row.type === '支出'; }),
+    incomeTotal: result.incomeTotal,
+    expenseTotal: result.expenseTotal,
+    balance: result.balance,
+    reportDateLabel: formatSettlementApprovalDate_(meta.reportDate),
+    auditDateLabel: formatSettlementApprovalDate_(meta.auditDate),
+    directorName: buildSettlementOfficerDisplayName_(meta.directorName),
+    accountantName: buildSettlementOfficerDisplayName_(meta.accountantName),
+    auditorName: buildSettlementOfficerDisplayName_(meta.auditorName),
+    outputDate: formatJapaneseEraDate_(new Date())
+  };
+}
+
+function applySettlementTableSection_(sheet, startRow, title, rows, totalAmount) {
+  sheet.getRange(startRow, 1, 1, 10).merge();
+  sheet.getRange(startRow, 1).setValue(title).setFontWeight('bold').setFontSize(10).setHorizontalAlignment('left');
+  var headerRow = startRow + 1;
+  sheet.getRange(headerRow, 1, 1, 3).merge();
+  sheet.getRange(headerRow, 4, 1, 2).merge();
+  sheet.getRange(headerRow, 6, 1, 2).merge();
+  sheet.getRange(headerRow, 8, 1, 3).merge();
+  sheet.getRange(headerRow, 1).setValue('科　目');
+  sheet.getRange(headerRow, 4).setValue('予算額');
+  sheet.getRange(headerRow, 6).setValue('決算額');
+  sheet.getRange(headerRow, 8).setValue('備　考');
+  sheet.getRange(headerRow, 1, 1, 10)
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID);
+
+  var rowIndex = headerRow + 1;
+  (rows || []).forEach(function(item, idx) {
+    sheet.getRange(rowIndex, 1, 1, 3).merge();
+    sheet.getRange(rowIndex, 4, 1, 2).merge();
+    sheet.getRange(rowIndex, 6, 1, 2).merge();
+    sheet.getRange(rowIndex, 8, 1, 3).merge();
+    sheet.getRange(rowIndex, 1).setValue((idx + 1) + '. ' + trim_(item.subjectName || item.subjectCode));
+    sheet.getRange(rowIndex, 4).setValue(toNumber_(item.budgetAmount));
+    sheet.getRange(rowIndex, 6).setValue(toNumber_(item.actualAmount));
+    sheet.getRange(rowIndex, 8).setValue(trim_(item.note));
+    sheet.getRange(rowIndex, 1, 1, 10)
+      .setVerticalAlignment('middle')
+      .setWrap(true)
+      .setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(rowIndex, 4, 1, 4).setNumberFormat('#,##0"円"');
+    sheet.getRange(rowIndex, 4).setHorizontalAlignment('right');
+    sheet.getRange(rowIndex, 6).setHorizontalAlignment('right');
+    sheet.getRange(rowIndex, 1).setHorizontalAlignment('left');
+    sheet.getRange(rowIndex, 8).setHorizontalAlignment('left');
+    sheet.setRowHeight(rowIndex, 28);
+    rowIndex += 1;
+  });
+
+  var totalBudget = (rows || []).reduce(function(sum, item) { return sum + toNumber_(item.budgetAmount); }, 0);
+  sheet.getRange(rowIndex, 1, 1, 3).merge();
+  sheet.getRange(rowIndex, 4, 1, 2).merge();
+  sheet.getRange(rowIndex, 6, 1, 2).merge();
+  sheet.getRange(rowIndex, 8, 1, 3).merge();
+  sheet.getRange(rowIndex, 1).setValue('合　計').setFontWeight('bold');
+  sheet.getRange(rowIndex, 4).setValue(totalBudget).setFontWeight('bold');
+  sheet.getRange(rowIndex, 6).setValue(totalAmount).setFontWeight('bold');
+  sheet.getRange(rowIndex, 1, 1, 10)
+    .setVerticalAlignment('middle')
+    .setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  sheet.getRange(rowIndex, 4, 1, 4).setNumberFormat('#,##0"円"');
+  sheet.getRange(rowIndex, 4).setHorizontalAlignment('right');
+  sheet.getRange(rowIndex, 6).setHorizontalAlignment('right');
+  sheet.getRange(rowIndex, 1).setHorizontalAlignment('left');
+  sheet.setRowHeight(rowIndex, 28);
+  return rowIndex;
+}
+
+function writeSettlementPdfSheet_(sheet, data) {
+  ensureSheetSize_(sheet, 160, 10);
+  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).breakApart();
+  sheet.clear();
+  sheet.clearFormats();
+  sheet.clearConditionalFormatRules();
+  sheet.setHiddenGridlines(true);
+
+  var widths = [52, 52, 92, 72, 72, 72, 72, 92, 92, 92];
+  widths.forEach(function(width, index) { sheet.setColumnWidth(index + 1, width); });
+
+  sheet.getRange(2, 1, 1, 10).merge();
+  sheet.getRange(2, 1)
+    .setValue(data.title)
+    .setFontSize(14)
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(2, 30);
+
+  var lastIncomeRow = applySettlementTableSection_(sheet, 4, '【収入の部】', data.incomeRows, data.incomeTotal);
+  var expenseStartRow = lastIncomeRow + 2;
+  var lastExpenseRow = applySettlementTableSection_(sheet, expenseStartRow, '【支出の部】', data.expenseRows, data.expenseTotal);
+
+  var summaryStartRow = lastExpenseRow + 2;
+  var labels = ['収　入　額', '支　出　額', '差　引　額'];
+  var values = [data.incomeTotal, data.expenseTotal, data.balance];
+  for (var i = 0; i < labels.length; i++) {
+    var row = summaryStartRow + i;
+    sheet.getRange(row, 2, 1, 2).merge();
+    sheet.getRange(row, 4, 1, 2).merge();
+    sheet.getRange(row, 2).setValue(labels[i]).setFontWeight('bold').setHorizontalAlignment('center');
+    sheet.getRange(row, 4).setValue(values[i]).setNumberFormat('#,##0"円"').setHorizontalAlignment('right');
+    sheet.getRange(row, 2, 1, 4).setVerticalAlignment('middle');
+    sheet.setRowHeight(row, 24);
+  }
+  sheet.getRange(summaryStartRow + 2, 1, 1, 6).setBorder(false, false, true, false, false, false, '#000000', SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+
+  var rowIndex = summaryStartRow + 5;
+  sheet.getRange(rowIndex, 1, 1, 10).merge();
+  sheet.getRange(rowIndex, 1).setValue('宍粟市野球部一般会計決算を上記のとおり報告します。').setHorizontalAlignment('left');
+  sheet.setRowHeight(rowIndex, 24);
+
+  rowIndex += 2;
+  sheet.getRange(rowIndex, 4, 1, 3).merge();
+  sheet.getRange(rowIndex, 4).setValue(data.reportDateLabel).setHorizontalAlignment('center');
+  sheet.setRowHeight(rowIndex, 24);
+
+  rowIndex += 1;
+  sheet.getRange(rowIndex, 6, 1, 1).setValue('監督').setHorizontalAlignment('center');
+  sheet.getRange(rowIndex, 7, 1, 4).merge();
+  sheet.getRange(rowIndex, 7).setValue('　' + data.directorName).setHorizontalAlignment('left');
+  sheet.setRowHeight(rowIndex, 24);
+
+  rowIndex += 1;
+  sheet.getRange(rowIndex, 6, 1, 1).setValue('会計').setHorizontalAlignment('center');
+  sheet.getRange(rowIndex, 7, 1, 4).merge();
+  sheet.getRange(rowIndex, 7).setValue('　' + data.accountantName).setHorizontalAlignment('left');
+  sheet.setRowHeight(rowIndex, 24);
+
+  rowIndex += 2;
+  sheet.getRange(rowIndex, 1, 1, 10).merge();
+  sheet.getRange(rowIndex, 1).setValue('宍粟市野球部一般会計監査を行い、関係する帳簿等を照らし合わせた結果、適切に処理されていたので、ここに報告します。').setHorizontalAlignment('left').setWrap(true);
+  sheet.setRowHeight(rowIndex, 36);
+
+  rowIndex += 2;
+  sheet.getRange(rowIndex, 4, 1, 3).merge();
+  sheet.getRange(rowIndex, 4).setValue(data.auditDateLabel).setHorizontalAlignment('center');
+  sheet.setRowHeight(rowIndex, 24);
+
+  rowIndex += 1;
+  sheet.getRange(rowIndex, 6, 1, 1).setValue('監査').setHorizontalAlignment('center');
+  sheet.getRange(rowIndex, 7, 1, 4).merge();
+  sheet.getRange(rowIndex, 7).setValue('　' + data.auditorName).setHorizontalAlignment('left');
+  sheet.setRowHeight(rowIndex, 24);
+
+  sheet.getRange(1, 1, rowIndex, 10).setFontSize(10).setFontFamily('Noto Sans JP').setVerticalAlignment('middle');
+}
+
+function exportSettlementSheet_(payload) {
+  validateCurrentUser_(payload.currentUser);
+  var fiscalYear = Number(payload.fiscalYear);
+  if (!fiscalYear) throw new Error('年度が必要です');
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ensureSettlementPdfSheetInitialized_(ss);
+  var data = buildSettlementPdfData_(fiscalYear, {
+    settlementRows: payload.settlementRows || [],
+    settlementMeta: payload.settlementMeta || {}
+  });
+  writeSettlementPdfSheet_(sheet, data);
+  var timestamp = Utilities.formatDate(new Date(), APP_TIMEZONE, 'yyyyMMdd_HHmmss');
+  var fileName = '一般会計決算書_' + fiscalYear + '年度_' + timestamp + '.pdf';
+  var pdfBlob = exportBudgetSheetPdfBlob_(sheet, fileName);
+  return {
+    ok: true,
+    fiscalYear: fiscalYear,
+    fileName: fileName,
+    mimeType: 'application/pdf',
+    pdfBase64: Utilities.base64Encode(pdfBlob.getBytes()),
+    createdAt: nowString_(),
+    incomeTotal: data.incomeTotal,
+    expenseTotal: data.expenseTotal,
+    balance: data.balance
+  };
+}
