@@ -1631,8 +1631,8 @@ function buildExpenseDataFromForm() {
     summary: summary,
     note: els.formNote.value.trim(),
     payee: payee,
-    paymentStatus: '支払済',
-    paymentDate: expenseDate,
+    paymentStatus: '',
+    paymentDate: '',
     relatedTravelControlNo: els.formRelatedTravelControlNo.value.trim()
   };
 }
@@ -1855,7 +1855,7 @@ function buildIncomeDataFromForm() {
   if (!subjectName) throw new Error('科目を選択してください');
   const incomeDate = requireValue(els.incomeFormDate.value, '収入日を入力してください');
   const summary = requireValue(els.incomeFormSummary.value, '摘要を入力してください').trim();
-  const payer = requireValue(els.incomeFormPayer.value, '入金元を入力してください').trim();
+  const payer = (els.incomeFormPayer.value || '').trim();
   const amount = requirePositiveNumber(els.incomeFormAmount.value, '収入金額を入力してください');
   return {
     fiscalYear: Number(requireValue(els.incomeFormFiscalYear.value, '年度を選択してください')),
@@ -1866,8 +1866,8 @@ function buildIncomeDataFromForm() {
     summary: summary,
     note: els.incomeFormNote.value.trim(),
     payer: payer,
-    paymentStatus: '入金済',
-    paymentDate: incomeDate
+    paymentStatus: '',
+    paymentDate: ''
   };
 }
 
@@ -3628,7 +3628,7 @@ state.csvImportObjectUrl = state.csvImportObjectUrl || '';
 state.csvExportObjectUrl = state.csvExportObjectUrl || '';
 
 const EXPENSE_IMPORT_TEMPLATE_HEADERS = ['伝票番号','年度','科目コード','科目名','支出日','支出金額','摘要','備考','支払先','関連旅費管理番号','登録日時','更新日時','登録者','更新者'];
-const INCOME_IMPORT_TEMPLATE_HEADERS = ['伝票番号','年度','科目コード','科目名','収入日','収入金額','摘要','備考','入金元','入金確認状況','入金確認日','登録日時','更新日時','登録者','更新者'];
+const INCOME_IMPORT_TEMPLATE_HEADERS = ['伝票番号','年度','科目コード','科目名','収入日','収入金額','摘要','備考','入金元','登録日時','更新日時','登録者','更新者'];
 
 const _cacheEnhancedElsForCsv_ = cacheEnhancedEls_;
 cacheEnhancedEls_ = function() {
@@ -3790,9 +3790,9 @@ function getCsvImportConfig_(kind) {
   return {
     title: '収入CSV取込',
     lead: '過去の収入データを CSV で一括取り込みできます。伝票番号は空欄なら自動採番、入力済みなら重複チェックを行います。',
-    required: ['年度', '科目名 または 科目コード', '収入日', '収入金額', '摘要', '入金元'],
-    optional: ['伝票番号', '科目コード', '科目名', '入金確認状況', '入金確認日', '登録日時', '更新日時', '登録者', '更新者'],
-    hint: '文字コードは UTF-8（BOM付き推奨）。入金確認状況・入金確認日は省略できます。科目コードが空欄でも既存判定または新規科目自動作成を行います。',
+    required: ['年度', '科目名 または 科目コード', '収入日', '収入金額', '摘要'],
+    optional: ['伝票番号', '科目コード', '科目名', '入金元', '登録日時', '更新日時', '登録者', '更新者'],
+    hint: '文字コードは UTF-8（BOM付き推奨）。入金元は空欄でも取り込めます。入金確認状況・入金確認日は不要で、科目コードが空欄でも既存判定または新規科目自動作成を行います。',
     templateName: 'income_import_template.csv',
     action: 'accounting/importIncomeCsv',
     refresh: function() { return loadIncomeList(); }

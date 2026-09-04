@@ -1150,9 +1150,17 @@ function outputJson_(data) {
   return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
 }
 
+function ensureAccountingDatabaseReadyForAction_(action) {
+  const name = trim_(action);
+  if (name.indexOf('accounting/') === 0) {
+    setupAccountingDatabase_();
+  }
+}
+
 function doGet(e) {
   const action = e && e.parameter ? e.parameter.action : '';
   try {
+    ensureAccountingDatabaseReadyForAction_(action);
     switch (action) {
       case 'listTravel': return outputJson_(listTravelRecords());
       case 'listMembers': return outputJson_(listMembers());
@@ -1184,6 +1192,7 @@ function doGet(e) {
 function doPost(e) {
   try {
     const payload = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    ensureAccountingDatabaseReadyForAction_(payload.action || '');
     switch (payload.action || '') {
       case 'createTravel': return outputJson_(createTravelRecord(payload.data || {}));
       case 'updateTravel': return outputJson_(updateTravelRecord(payload.controlNo, payload.data || {}));
@@ -1323,6 +1332,7 @@ function nowString_() {
 }
 
 function getSheetDataObjects_(sheet, headers) {
+  if (!sheet) return [];
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
   const values = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
@@ -1528,7 +1538,7 @@ function normalizeExpenseVoucherPayload_(data) {
     summary: trim_(data.summary),
     note: trim_(data.note),
     payee: trim_(data.payee),
-    paymentStatus: trim_(data.paymentStatus) || '未払',
+    paymentStatus: trim_(data.paymentStatus),
     paymentDate: trim_(data.paymentDate),
     relatedTravelControlNo: trim_(data.relatedTravelControlNo)
   };
@@ -1720,7 +1730,7 @@ function setExpensePaymentStatus_(payload) {
   if (row < 0) throw new Error('支出伝票が見つかりません');
 
   const map = getHeaderMap_(ACCOUNTING_EXPENSE_HEADERS);
-  sheet.getRange(row, map['支払状況'] + 1).setValue(trim_(payload.paymentStatus) || '未払');
+  sheet.getRange(row, map['支払状況'] + 1).setValue(trim_(payload.paymentStatus));
   sheet.getRange(row, map['支払日'] + 1).setValue(trim_(payload.paymentDate));
   sheet.getRange(row, map['更新日時'] + 1).setValue(nowString_());
   sheet.getRange(row, map['更新者'] + 1).setValue(currentUser.name);
@@ -1737,7 +1747,6 @@ function normalizeIncomeVoucherPayload_(data) {
   if (!trim_(data.incomeDate)) throw new Error('収入日は必須です');
   if (amount <= 0) throw new Error('収入金額は0より大きい値を入力してください');
   if (!trim_(data.summary)) throw new Error('摘要は必須です');
-  if (!trim_(data.payer)) throw new Error('入金元は必須です');
 
   return {
     fiscalYear: fiscalYear,
@@ -1748,7 +1757,7 @@ function normalizeIncomeVoucherPayload_(data) {
     summary: trim_(data.summary),
     note: trim_(data.note),
     payer: trim_(data.payer),
-    paymentStatus: trim_(data.paymentStatus) || '未確認',
+    paymentStatus: trim_(data.paymentStatus),
     paymentDate: trim_(data.paymentDate)
   };
 }
@@ -2154,7 +2163,7 @@ function createExpenseVoucherFromTravel_(payload) {
       summary: trim_(overrides.summary) || [travel.tripName, travel.driverName].filter(Boolean).join(' / '),
       note: trim_(overrides.note),
       payee: trim_(overrides.payee) || travel.driverName,
-      paymentStatus: trim_(overrides.paymentStatus) || '未払',
+      paymentStatus: trim_(overrides.paymentStatus),
       paymentDate: trim_(overrides.paymentDate),
       relatedTravelControlNo: travel.controlNo
     }
@@ -3298,6 +3307,51 @@ function exportSettlementSheet_(payload) {
 }
 
 
+
+function clearLegacyIncomePaymentFields_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(ACCOUNTING_INCOME_SHEET_NAME);
+  if (!sheet) return { ok: true, cleared: 0 };
+  const rows = getSheetDataObjects_(sheet, ACCOUNTING_INCOME_HEADERS);
+  if (!rows.length) return { ok: true, cleared: 0 };
+  const map = getHeaderMap_(ACCOUNTING_INCOME_HEADERS);
+  let cleared = 0;
+  rows.forEach(function(row, index) {
+    const rowNumber = index + 2;
+    const status = trim_(row['入金確認状況']);
+    const paymentDate = trim_(row['入金確認日']);
+    if (status || paymentDate) {
+      sheet.getRange(rowNumber, map['入金確認状況'] + 1, 1, 2).setValues([['', '']]);
+      cleared += 1;
+    }
+  });
+  return { ok: true, cleared: cleared };
+}
+
+function runClearLegacyIncomePaymentFields() {
+  return clearLegacyIncomePaymentFields_();
+}
+
+function clearLegacyExpensePaymentFields_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(ACCOUNTING_EXPENSE_SHEET_NAME);
+  if (!sheet) return { ok: true, cleared: 0 };
+  const rows = getSheetDataObjects_(sheet, ACCOUNTING_EXPENSE_HEADERS);
+  if (!rows.length) return { ok: true, cleared: 0 };
+  const map = getHeaderMap_(ACCOUNTING_EXPENSE_HEADERS);
+  let cleared = 0;
+  rows.forEach(function(row, index) {
+    const rowNumber = index + 2;
+    const status = trim_(row['支払状況']);
+    const paymentDate = trim_(row['支払日']);
+    if (status || paymentDate) {
+      sheet.getRange(rowNumber, map['支払状況'] + 1, 1, 2).setValues([['', '']]);
+      cleared += 1;
+    }
+  });
+  return { ok: true, cleared: cleared };
+}
+
 /* === CSV import/export enhancement block === */
 const ACCOUNTING_EXPENSE_CSV_HEADERS = ['伝票番号','年度','科目コード','科目名','支出日','支出金額','摘要','備考','支払先','支払状況','支払日','関連旅費管理番号','登録日時','更新日時','登録者','更新者'];
 const ACCOUNTING_INCOME_CSV_HEADERS = ['伝票番号','年度','科目コード','科目名','収入日','収入金額','摘要','備考','入金元','入金確認状況','入金確認日','登録日時','更新日時','登録者','更新者'];
@@ -3414,7 +3468,7 @@ function importExpenseCsv_(payload) {
     statusKey: '支払状況',
     paymentDateKey: '支払日',
     extraKey: '関連旅費管理番号',
-    defaultStatus: '未払',
+    defaultStatus: '',
     typeValue: '支出',
     requireCounterparty: false,
     requiredHeaders: ['年度', '支出日', '支出金額', '摘要'],
@@ -3436,10 +3490,10 @@ function importIncomeCsv_(payload) {
     statusKey: '入金確認状況',
     paymentDateKey: '入金確認日',
     extraKey: '',
-    defaultStatus: '未確認',
+    defaultStatus: '',
     typeValue: '収入',
-    requireCounterparty: true,
-    requiredHeaders: ['年度', '収入日', '収入金額', '摘要', '入金元'],
+    requireCounterparty: false,
+    requiredHeaders: ['年度', '収入日', '収入金額', '摘要'],
     atLeastOneHeaderGroups: [['科目コード', '科目名']]
   });
 }
