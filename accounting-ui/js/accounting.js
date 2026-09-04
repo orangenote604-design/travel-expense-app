@@ -4005,3 +4005,362 @@ async function executeCsvImport_() {
     hideLoading();
   }
 }
+
+
+/* === settlement enhancement v20260904 === */
+storageKeys.settlementDraftPrefix = 'accountingSettlementDraft_';
+state.settlementMeta = state.settlementMeta || {
+  reportDate: '',
+  auditDate: '',
+  directorName: '',
+  accountantName: '',
+  auditorName: ''
+};
+
+function getSettlementFiscalYear_() {
+  return Number((els.settlementFiscalYear && els.settlementFiscalYear.value) || state.currentFiscalYear || getCurrentFiscalYear_());
+}
+
+function getSettlementDraftStorageKey_(fiscalYear) {
+  return `${storageKeys.settlementDraftPrefix}${Number(fiscalYear || 0)}`;
+}
+
+function getDefaultSettlementMeta_() {
+  return {
+    reportDate: '',
+    auditDate: '',
+    directorName: '',
+    accountantName: '',
+    auditorName: ''
+  };
+}
+
+function readSettlementDraft_(fiscalYear) {
+  try {
+    const raw = localStorage.getItem(getSettlementDraftStorageKey_(fiscalYear));
+    if (!raw) return { meta: getDefaultSettlementMeta_(), notes: {} };
+    const parsed = JSON.parse(raw);
+    return {
+      meta: Object.assign(getDefaultSettlementMeta_(), parsed && parsed.meta ? parsed.meta : {}),
+      notes: parsed && parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {}
+    };
+  } catch (error) {
+    console.warn(error);
+    return { meta: getDefaultSettlementMeta_(), notes: {} };
+  }
+}
+
+function writeSettlementDraft_(fiscalYear, silent) {
+  try {
+    const payload = {
+      meta: getSettlementMetaFromForm_(),
+      notes: getSettlementNotesMap_()
+    };
+    localStorage.setItem(getSettlementDraftStorageKey_(fiscalYear), JSON.stringify(payload));
+    if (!silent) showToast('決算書入力内容を保存しました', 'success');
+  } catch (error) {
+    console.warn(error);
+    if (!silent) showToast('ブラウザ保存に失敗しました', 'error');
+  }
+}
+
+function getSettlementNotesMap_() {
+  const map = {};
+  (state.settlementRows || []).forEach(function(row) {
+    const key = [row.type || '', row.subjectCode || ''].join('|');
+    map[key] = row.note || '';
+  });
+  return map;
+}
+
+function applySettlementDraftToRows_(rows, draft) {
+  const noteMap = draft && draft.notes ? draft.notes : {};
+  return (rows || []).map(function(row) {
+    const cloned = Object.assign({}, row);
+    const key = [cloned.type || '', cloned.subjectCode || ''].join('|');
+    if (Object.prototype.hasOwnProperty.call(noteMap, key)) cloned.note = noteMap[key] || '';
+    return cloned;
+  });
+}
+
+function ensureSettlementEnhancedLayout_() {
+  const page = document.getElementById('page-settlement');
+  if (!page) return;
+  const actions = page.querySelector('.page-actions');
+  if (actions && !document.getElementById('saveSettlementButton')) {
+    const exportButton = document.getElementById('exportSettlementPdfButton');
+    const saveHtml = '<button id="saveSettlementButton" class="button success" type="button">入力内容を保存</button>';
+    if (exportButton) {
+      exportButton.insertAdjacentHTML('beforebegin', saveHtml);
+    } else {
+      actions.insertAdjacentHTML('beforeend', saveHtml);
+    }
+  }
+  if (!document.getElementById('settlementApprovalCard')) {
+    const summaryGrid = page.querySelector('.summary-grid');
+    const html = `
+      <div id="settlementApprovalCard" class="card form-card settlement-approval-card">
+        <div class="card-title-row">
+          <div>
+            <div class="card-title">決算書記載情報</div>
+            <div class="inline-note">PDF出力に使用する日付・氏名と、科目ごとの備考を入力できます。氏名は部員一覧から選択します。</div>
+          </div>
+        </div>
+        <div class="form-grid settlement-form-grid">
+          <label class="field compact-field">
+            <span>決算報告日</span>
+            <input type="date" id="settlementReportDate" />
+          </label>
+          <label class="field compact-field">
+            <span>監査実施日</span>
+            <input type="date" id="settlementAuditDate" />
+          </label>
+          <label class="field compact-field">
+            <span>監督</span>
+            <select id="settlementDirectorName"></select>
+          </label>
+          <label class="field compact-field">
+            <span>会計</span>
+            <select id="settlementAccountantName"></select>
+          </label>
+          <label class="field compact-field">
+            <span>監査</span>
+            <select id="settlementAuditorName"></select>
+          </label>
+        </div>
+      </div>
+    `;
+    if (summaryGrid) {
+      summaryGrid.insertAdjacentHTML('afterend', html);
+    } else {
+      page.insertAdjacentHTML('beforeend', html);
+    }
+  }
+}
+
+const _cacheEnhancedElsForSettlementEnhancement_ = cacheEnhancedEls_;
+cacheEnhancedEls_ = function() {
+  if (typeof _cacheEnhancedElsForSettlementEnhancement_ === 'function') _cacheEnhancedElsForSettlementEnhancement_();
+  Object.assign(els, {
+    saveSettlementButton: document.getElementById('saveSettlementButton'),
+    settlementReportDate: document.getElementById('settlementReportDate'),
+    settlementAuditDate: document.getElementById('settlementAuditDate'),
+    settlementDirectorName: document.getElementById('settlementDirectorName'),
+    settlementAccountantName: document.getElementById('settlementAccountantName'),
+    settlementAuditorName: document.getElementById('settlementAuditorName')
+  });
+};
+
+const _ensureEnhancedLayoutForSettlementEnhancement_ = ensureEnhancedLayout_;
+ensureEnhancedLayout_ = function() {
+  if (typeof _ensureEnhancedLayoutForSettlementEnhancement_ === 'function') _ensureEnhancedLayoutForSettlementEnhancement_();
+  ensureSettlementEnhancedLayout_();
+  cacheEnhancedEls_();
+};
+
+function getSettlementMetaFromForm_() {
+  return {
+    reportDate: els.settlementReportDate ? els.settlementReportDate.value || '' : '',
+    auditDate: els.settlementAuditDate ? els.settlementAuditDate.value || '' : '',
+    directorName: els.settlementDirectorName ? els.settlementDirectorName.value || '' : '',
+    accountantName: els.settlementAccountantName ? els.settlementAccountantName.value || '' : '',
+    auditorName: els.settlementAuditorName ? els.settlementAuditorName.value || '' : ''
+  };
+}
+
+function renderSettlementMetaForm_() {
+  const meta = Object.assign(getDefaultSettlementMeta_(), state.settlementMeta || {});
+  populateSettlementOfficerSelect_(els.settlementDirectorName, meta.directorName);
+  populateSettlementOfficerSelect_(els.settlementAccountantName, meta.accountantName);
+  populateSettlementOfficerSelect_(els.settlementAuditorName, meta.auditorName);
+  if (els.settlementReportDate) els.settlementReportDate.value = meta.reportDate || '';
+  if (els.settlementAuditDate) els.settlementAuditDate.value = meta.auditDate || '';
+}
+
+function populateSettlementOfficerSelect_(select, selectedValue) {
+  if (!select) return;
+  const users = (state.users || []).map(function(user) { return (user && user.name ? String(user.name) : '').trim(); }).filter(Boolean);
+  const uniqueUsers = Array.from(new Set(users));
+  const current = selectedValue || select.value || '';
+  const options = ['<option value="">未選択</option>'];
+  uniqueUsers.forEach(function(name) {
+    const selected = name === current ? ' selected' : '';
+    options.push(`<option value="${escapeAttribute(name)}"${selected}>${escapeHtml(name)}</option>`);
+  });
+  if (current && uniqueUsers.indexOf(current) === -1) {
+    options.push(`<option value="${escapeAttribute(current)}" selected>${escapeHtml(current)}</option>`);
+  }
+  select.innerHTML = options.join('');
+  select.value = current;
+}
+
+function bindSettlementMetaAutosave_() {
+  [
+    els.settlementReportDate,
+    els.settlementAuditDate,
+    els.settlementDirectorName,
+    els.settlementAccountantName,
+    els.settlementAuditorName
+  ].filter(Boolean).forEach(function(el) {
+    if (el.dataset.settlementBound === 'true') return;
+    el.dataset.settlementBound = 'true';
+    el.addEventListener('change', function() {
+      state.settlementMeta = getSettlementMetaFromForm_();
+      writeSettlementDraft_(getSettlementFiscalYear_(), true);
+    });
+  });
+}
+
+function getSettlementSnapshot() {
+  return JSON.stringify({
+    fiscalYear: getSettlementFiscalYear_(),
+    meta: getSettlementMetaFromForm_(),
+    rows: (state.settlementRows || []).map(function(row) {
+      return {
+        type: row.type || '',
+        subjectCode: row.subjectCode || '',
+        note: row.note || ''
+      };
+    })
+  });
+}
+
+async function saveSettlementInput() {
+  const fiscalYear = getSettlementFiscalYear_();
+  state.settlementMeta = getSettlementMetaFromForm_();
+  writeSettlementDraft_(fiscalYear, true);
+  clearUnsavedContext('settlement');
+  setUnsavedBaseline('settlement', getSettlementSnapshot());
+  showToast('決算書入力内容を保存しました', 'success');
+}
+
+const _bindEventsForSettlementEnhancement_ = bindEvents;
+bindEvents = function() {
+  if (typeof _bindEventsForSettlementEnhancement_ === 'function') _bindEventsForSettlementEnhancement_();
+  bindSettlementMetaAutosave_();
+  on(els.saveSettlementButton, 'click', saveSettlementInput);
+};
+
+const _loadUsersForSettlementEnhancement_ = loadUsers;
+loadUsers = async function() {
+  await _loadUsersForSettlementEnhancement_();
+  renderSettlementMetaForm_();
+  bindSettlementMetaAutosave_();
+};
+
+async function loadSettlementPage() {
+  if (!state.currentUser) return showUserSelectScreen();
+  clearSettlementPdfResult();
+  ensureSettlementEnhancedLayout_();
+  cacheEnhancedEls_();
+  renderSettlementMetaForm_();
+  bindSettlementMetaAutosave_();
+  showLoading('決算書を読み込んでいます...');
+  try {
+    const fiscalYear = Number(requireValue((els.settlementFiscalYear && els.settlementFiscalYear.value) || state.currentFiscalYear, '年度を選択してください'));
+    const result = await apiGet('accounting/buildSettlementSummary', { fiscalYear: fiscalYear });
+    const draft = readSettlementDraft_(fiscalYear);
+    state.settlementMeta = Object.assign(getDefaultSettlementMeta_(), draft.meta || {});
+    state.settlementRows = applySettlementDraftToRows_(result.summary || [], draft);
+    renderSettlementMetaForm_();
+    renderSettlementTable();
+    if (els.settlementIncomeTotal) els.settlementIncomeTotal.textContent = formatCurrency(result.incomeTotal || 0);
+    if (els.settlementExpenseTotal) els.settlementExpenseTotal.textContent = formatCurrency(result.expenseTotal || 0);
+    if (els.settlementBalanceTotal) els.settlementBalanceTotal.textContent = formatCurrency(result.balance || 0);
+    setUnsavedBaseline('settlement', getSettlementSnapshot());
+  } catch (error) {
+    state.settlementRows = [];
+    renderSettlementTable();
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function renderSettlementTable() {
+  if (!els.settlementTableBody) return;
+  const rows = state.settlementRows || [];
+  if (els.settlementCountLabel) els.settlementCountLabel.textContent = `${rows.length}件`;
+  if (!rows.length) {
+    els.settlementTableBody.innerHTML = '<tr><td colspan="7" class="empty-cell">該当する決算データがありません。</td></tr>';
+    return;
+  }
+  const sections = ['収入', '支出'];
+  const html = [];
+  sections.forEach(function(section) {
+    const sectionRows = rows.filter(function(row) { return row.type === section; });
+    if (!sectionRows.length) return;
+    html.push(`<tr class="settlement-section-row"><td colspan="7">${escapeHtml(section)}の部</td></tr>`);
+    sectionRows.forEach(function(row) {
+      const rowKey = [row.type || '', row.subjectCode || ''].join('|');
+      html.push(`
+        <tr>
+          <td>${escapeHtml(row.type || '')}</td>
+          <td>${escapeHtml(row.subjectCode || '')}</td>
+          <td>${escapeHtml(row.subjectName || '')}</td>
+          <td class="text-right">${escapeHtml(formatNumber(row.budgetAmount || 0))}</td>
+          <td class="text-right">${escapeHtml(formatNumber(row.actualAmount || 0))}</td>
+          <td class="text-right">${escapeHtml(formatNumber(row.diffAmount || 0))}</td>
+          <td><input class="budget-note-input settlement-note-input" type="text" data-settlement-key="${escapeAttribute(rowKey)}" value="${escapeAttribute(row.note || '')}" placeholder="備考を入力" /></td>
+        </tr>
+      `);
+    });
+    const totalBudget = sectionRows.reduce(function(sum, row) { return sum + Number(row.budgetAmount || 0); }, 0);
+    const totalActual = sectionRows.reduce(function(sum, row) { return sum + Number(row.actualAmount || 0); }, 0);
+    const totalDiff = sectionRows.reduce(function(sum, row) { return sum + Number(row.diffAmount || 0); }, 0);
+    html.push(`
+      <tr class="settlement-total-row">
+        <td colspan="3">${escapeHtml(section)}合計</td>
+        <td class="text-right">${escapeHtml(formatNumber(totalBudget))}</td>
+        <td class="text-right">${escapeHtml(formatNumber(totalActual))}</td>
+        <td class="text-right">${escapeHtml(formatNumber(totalDiff))}</td>
+        <td></td>
+      </tr>
+    `);
+  });
+  els.settlementTableBody.innerHTML = html.join('');
+  els.settlementTableBody.querySelectorAll('[data-settlement-key]').forEach(function(input) {
+    input.addEventListener('input', function() {
+      const key = input.dataset.settlementKey || '';
+      const target = (state.settlementRows || []).find(function(row) {
+        return [row.type || '', row.subjectCode || ''].join('|') === key;
+      });
+      if (!target) return;
+      target.note = input.value;
+      updateUnsavedContext('settlement', getSettlementSnapshot());
+      writeSettlementDraft_(getSettlementFiscalYear_(), true);
+    });
+  });
+}
+
+async function generateSettlementPdf() {
+  if (!state.currentUser) return showToast('利用者を選択してください', 'error');
+  const fiscalYear = requireValue((els.settlementFiscalYear && els.settlementFiscalYear.value) || state.currentFiscalYear, '年度を選択してください');
+  state.settlementMeta = getSettlementMetaFromForm_();
+  writeSettlementDraft_(Number(fiscalYear), true);
+  clearSettlementPdfResult();
+  if (!window.confirm(`${fiscalYear}年度の決算書PDFを生成しますか？`)) return;
+  showLoading('決算書PDFを生成しています...');
+  try {
+    const result = await apiPost('accounting/exportSettlementSheet', {
+      currentUser: state.currentUser,
+      fiscalYear: Number(fiscalYear),
+      settlementRows: (state.settlementRows || []).map(function(row) {
+        return {
+          type: row.type || '',
+          subjectCode: row.subjectCode || '',
+          note: row.note || ''
+        };
+      }),
+      settlementMeta: state.settlementMeta
+    });
+    clearUnsavedContext('settlement');
+    setUnsavedBaseline('settlement', getSettlementSnapshot());
+    renderSettlementPdfResult(result);
+    showToast('決算書PDFを生成しました', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
