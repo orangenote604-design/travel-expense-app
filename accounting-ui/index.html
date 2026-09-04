@@ -305,34 +305,32 @@
               <p class="page-description">会計システムで利用する部員マスタを確認・追加・編集・削除できます。ここで変更した内容は利用者選択にも反映されます。</p>
             </div>
             <div class="page-actions wrap-actions">
-              <label class="field compact-field">
-                <span>並び順</span>
-                <select id="memberSortOrder">
-                  <option value="sheet">登録順</option>
-                  <option value="nameAsc">氏名昇順</option>
-                  <option value="nameDesc">氏名降順</option>
-                </select>
-              </label>
               <label class="field compact-field grow-field">
                 <span>氏名検索</span>
                 <input type="text" id="memberKeyword" placeholder="氏名で絞り込み" />
               </label>
               <button id="searchMembersButton" class="button primary" type="button">検索</button>
               <button id="reloadMembersButton" class="button secondary" type="button">再読み込み</button>
+              <button id="saveMemberOrderButton" class="button secondary" type="button" disabled>並び順を保存</button>
+              <button id="resetMemberOrderButton" class="button secondary" type="button" disabled>元に戻す</button>
               <button id="openMemberCreateButton" class="button success" type="button">新規登録</button>
             </div>
           </div>
 
           <div class="content-grid narrow-detail-grid">
             <div class="card table-card">
-              <div class="card-title-row">
-                <div class="card-title">部員一覧</div>
+              <div class="card-title-row member-table-head-row">
+                <div>
+                  <div class="card-title">部員一覧</div>
+                  <div id="memberOrderStatus" class="inline-note">ドラッグ＆ドロップで並び替えできます。保存するとスプレッドシートの順番も更新されます。</div>
+                </div>
                 <div id="memberCountLabel" class="inline-note">0件</div>
               </div>
               <div class="table-wrap simple-table-wrap">
-                <table class="simple-table">
+                <table class="simple-table member-table">
                   <thead>
                     <tr>
+                      <th class="member-drag-col">移動</th>
                       <th>氏名</th>
                     </tr>
                   </thead>

@@ -35,6 +35,7 @@ const state = {
     pendingEvidenceFile: null
   },
   memberRows: [],
+  memberOrderInitialRows: [],
   selectedMember: null,
   memberForm: {
     mode: 'create',
@@ -177,8 +178,10 @@ const els = {
   saveIncomeButtonBottom: document.getElementById('saveIncomeButtonBottom'),
 
 
-  memberSortOrder: document.getElementById('memberSortOrder'),
   memberKeyword: document.getElementById('memberKeyword'),
+  saveMemberOrderButton: document.getElementById('saveMemberOrderButton'),
+  resetMemberOrderButton: document.getElementById('resetMemberOrderButton'),
+  memberOrderStatus: document.getElementById('memberOrderStatus'),
   searchMembersButton: document.getElementById('searchMembersButton'),
   reloadMembersButton: document.getElementById('reloadMembersButton'),
   openMemberCreateButton: document.getElementById('openMemberCreateButton'),
@@ -346,13 +349,15 @@ function bindEvents() {
   els.incomeRemoveEvidenceCheckbox.addEventListener('change', renderIncomeFormEvidenceInfo);
 
 
-  els.searchMembersButton.addEventListener('click', function() { loadMemberMaster(); });
-  els.reloadMembersButton.addEventListener('click', function() { loadUsers().then(loadMemberMaster); });
+  els.searchMembersButton.addEventListener('click', renderMemberTable);
+  els.reloadMembersButton.addEventListener('click', reloadMemberMaster);
+  els.saveMemberOrderButton.addEventListener('click', saveMemberOrder);
+  els.resetMemberOrderButton.addEventListener('click', resetMemberOrder);
   els.memberSortOrder.addEventListener('change', renderMemberTable);
   els.memberKeyword.addEventListener('keydown', function(event) {
     if (event.key === 'Enter') {
       event.preventDefault();
-      loadMemberMaster();
+      renderMemberTable();
     }
   });
   els.openMemberCreateButton.addEventListener('click', openMemberCreateModal);
@@ -538,6 +543,7 @@ function getUnsavedContextForPage(pageName) {
   if (pageName === 'expense-form') return 'expenseForm';
   if (pageName === 'income-form') return 'incomeForm';
   if (pageName === 'budget') return 'budget';
+  if (pageName === 'members') return 'memberOrder';
   return '';
 }
 
@@ -598,6 +604,10 @@ function getMemberFormSnapshot() {
   });
 }
 
+function getMemberOrderSnapshot() {
+  return JSON.stringify((state.memberRows || []).map(function(row) { return row.name || ''; }));
+}
+
 function getSubjectFormSnapshot() {
   return JSON.stringify({
     mode: state.subjectForm.mode,
@@ -642,6 +652,12 @@ function discardUnsavedChangesForContext(context) {
     }
     return;
   }
+  if (context === 'memberOrder') {
+    state.memberRows = clonePlain(state.memberOrderInitialRows) || [];
+    renderMemberTable();
+    setUnsavedBaseline('memberOrder', getMemberOrderSnapshot());
+    return;
+  }
   if (context === 'subjectForm') {
     if ((state.subjectForm.mode || 'create') === 'edit') {
       openSubjectEditModal(clonePlain(state.subjectForm.initialSubject) || {});
@@ -659,7 +675,7 @@ function discardUnsavedChangesForContext(context) {
 }
 
 function discardAllUnsavedChanges() {
-  ['memberForm', 'subjectForm', 'expenseForm', 'incomeForm', 'budget'].forEach(function(context) {
+  ['memberForm', 'subjectForm', 'expenseForm', 'incomeForm', 'budget', 'memberOrder'].forEach(function(context) {
     if (!hasUnsavedChanges(context)) return;
     discardUnsavedChangesForContext(context);
     clearUnsavedContext(context);
@@ -865,75 +881,207 @@ async function switchCurrentUser(user) {
 }
 
 
-async function loadMemberMaster() {
+async function loadMemberMaster(options) {
+  const opts = options || {};
   if (!state.currentUser) return showUserSelectScreen();
+  if (!opts.force && hasUnsavedChanges('memberOrder')) {
+    if (!window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+    discardUnsavedChangesForContext('memberOrder');
+    clearUnsavedContext('memberOrder');
+  }
   showLoading('部員一覧を読み込んでいます...');
   try {
-    const keyword = (els.memberKeyword.value || '').trim();
-    const source = state.users.length ? state.users.slice() : (await apiGet('accounting/listMemberMaster', { keyword: keyword })).users || [];
-    const rows = source.map(function(user, index) {
+    const result = await apiGet('accounting/listMemberMaster', {});
+    const rows = (result.users || []).map(function(user, index) {
       return Object.assign({}, user, { __sheetOrder: index + 1 });
-    }).filter(function(user) {
-      return !keyword || String(user.name || '').indexOf(keyword) !== -1;
     });
     state.memberRows = rows;
+    state.memberOrderInitialRows = clonePlain(rows) || [];
     renderMemberTable();
+    setUnsavedBaseline('memberOrder', getMemberOrderSnapshot());
     if (state.selectedMember) {
-      const matched = rows.find(function(row) { return row.name === state.selectedMember.name; });
+      const matched = state.memberRows.find(function(row) { return row.name === state.selectedMember.name; });
       matched ? renderMemberDetail(matched) : clearMemberDetail();
     } else {
       clearMemberDetail();
     }
   } catch (error) {
     state.memberRows = [];
+    state.memberOrderInitialRows = [];
     renderMemberTable();
     clearMemberDetail();
+    clearUnsavedContext('memberOrder');
     showToast(error.message, 'error');
   } finally {
     hideLoading();
   }
 }
 
-function getSortedMemberRows() {
-  const rows = (state.memberRows || []).slice();
-  const sortOrder = els.memberSortOrder ? els.memberSortOrder.value : 'sheet';
-  if (sortOrder === 'nameAsc') {
-    rows.sort(function(a, b) {
-      return String(a.name || '').localeCompare(String(b.name || ''), 'ja');
-    });
-    return rows;
-  }
-  if (sortOrder === 'nameDesc') {
-    rows.sort(function(a, b) {
-      return String(b.name || '').localeCompare(String(a.name || ''), 'ja');
-    });
-    return rows;
-  }
-  rows.sort(function(a, b) {
-    return Number(a.__sheetOrder || 0) - Number(b.__sheetOrder || 0);
+function getFilteredMemberRows() {
+  const keyword = (els.memberKeyword.value || '').trim();
+  return (state.memberRows || []).filter(function(user) {
+    return !keyword || String(user.name || '').indexOf(keyword) !== -1;
   });
-  return rows;
+}
+
+function canReorderMembers() {
+  return !(els.memberKeyword.value || '').trim();
+}
+
+function updateMemberOrderUiState() {
+  const canReorder = canReorderMembers();
+  const hasRows = (state.memberRows || []).length > 1;
+  const dirty = hasUnsavedChanges('memberOrder');
+  if (els.saveMemberOrderButton) els.saveMemberOrderButton.disabled = !dirty || !canReorder || !hasRows;
+  if (els.resetMemberOrderButton) els.resetMemberOrderButton.disabled = !dirty;
+  if (!els.memberOrderStatus) return;
+  if (!hasRows) {
+    els.memberOrderStatus.textContent = '部員が1件以下のため並び替えは不要です。';
+    return;
+  }
+  if (!canReorder) {
+    els.memberOrderStatus.textContent = '検索中は並び替えできません。検索条件をクリアするとドラッグできます。';
+    return;
+  }
+  if (dirty) {
+    els.memberOrderStatus.textContent = '並び順を変更しました。「並び順を保存」でスプレッドシートへ反映できます。';
+    return;
+  }
+  els.memberOrderStatus.textContent = 'ドラッグ＆ドロップで並び替えできます。保存するとスプレッドシートの順番も更新されます。';
 }
 
 function renderMemberTable() {
-  const rows = getSortedMemberRows();
+  const rows = getFilteredMemberRows();
+  const reorderEnabled = canReorderMembers() && rows.length > 1;
   els.memberCountLabel.textContent = `${rows.length}件`;
   if (!rows.length) {
-    els.memberTableBody.innerHTML = '<tr><td class="empty-cell">該当する部員がいません。</td></tr>';
+    els.memberTableBody.innerHTML = '<tr><td colspan="2" class="empty-cell">該当する部員がいません。</td></tr>';
+    updateMemberOrderUiState();
     return;
   }
   const selectedName = state.selectedMember ? state.selectedMember.name : '';
   els.memberTableBody.innerHTML = rows.map(function(row) {
     const name = row.name || '';
-    const selectedClass = name === selectedName ? ' class="selected-row"' : '';
-    return `<tr${selectedClass}><td><button type="button" class="table-row-button" data-member-name="${escapeHtml(name)}">${escapeHtml(name)}</button></td></tr>`;
+    const selectedClass = name === selectedName ? ' selected-row' : '';
+    const rowClass = reorderEnabled ? 'member-draggable-row' : '';
+    const handleClass = reorderEnabled ? 'member-drag-handle' : 'member-drag-handle disabled';
+    const handleText = reorderEnabled ? '↕' : '—';
+    return `
+      <tr class="${selectedClass} ${rowClass}" data-member-row="1" data-member-name="${escapeHtml(name)}" ${reorderEnabled ? 'draggable="true"' : ''}>
+        <td class="member-sort-cell"><span class="${handleClass}" title="ドラッグして並び替え">${handleText}</span></td>
+        <td><button type="button" class="table-row-button" data-member-name="${escapeHtml(name)}">${escapeHtml(name)}</button></td>
+      </tr>
+    `;
   }).join('');
   els.memberTableBody.querySelectorAll('[data-member-name]').forEach(function(button) {
     button.addEventListener('click', function() {
-      const member = rows.find(function(row) { return row.name === button.dataset.memberName; });
+      const member = state.memberRows.find(function(row) { return row.name === button.dataset.memberName; });
       if (member) renderMemberDetail(member);
     });
   });
+  bindMemberRowDragEvents(reorderEnabled);
+  updateMemberOrderUiState();
+}
+
+function bindMemberRowDragEvents(enabled) {
+  const rows = Array.from(els.memberTableBody.querySelectorAll('[data-member-row]'));
+  if (!enabled) return;
+  rows.forEach(function(row) {
+    row.addEventListener('dragstart', function(event) {
+      row.classList.add('dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', row.dataset.memberName || '');
+    });
+    row.addEventListener('dragend', function() {
+      row.classList.remove('dragging');
+      rows.forEach(function(item) {
+        item.classList.remove('drag-over-top');
+        item.classList.remove('drag-over-bottom');
+      });
+    });
+    row.addEventListener('dragover', function(event) {
+      event.preventDefault();
+      const rect = row.getBoundingClientRect();
+      const insertAfter = event.clientY >= rect.top + rect.height / 2;
+      row.classList.toggle('drag-over-top', !insertAfter);
+      row.classList.toggle('drag-over-bottom', insertAfter);
+      event.dataTransfer.dropEffect = 'move';
+    });
+    row.addEventListener('dragleave', function() {
+      row.classList.remove('drag-over-top');
+      row.classList.remove('drag-over-bottom');
+    });
+    row.addEventListener('drop', function(event) {
+      event.preventDefault();
+      row.classList.remove('drag-over-top');
+      row.classList.remove('drag-over-bottom');
+      const sourceName = event.dataTransfer.getData('text/plain');
+      const targetName = row.dataset.memberName || '';
+      if (!sourceName || !targetName || sourceName === targetName) return;
+      const rect = row.getBoundingClientRect();
+      const insertAfter = event.clientY >= rect.top + rect.height / 2;
+      moveMemberRow(sourceName, targetName, insertAfter);
+    });
+  });
+}
+
+function moveMemberRow(sourceName, targetName, insertAfter) {
+  const rows = (state.memberRows || []).slice();
+  const sourceIndex = rows.findIndex(function(row) { return row.name === sourceName; });
+  const targetIndex = rows.findIndex(function(row) { return row.name === targetName; });
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+  const moved = rows.splice(sourceIndex, 1)[0];
+  const baseIndex = rows.findIndex(function(row) { return row.name === targetName; });
+  const nextIndex = insertAfter ? baseIndex + 1 : baseIndex;
+  rows.splice(nextIndex, 0, moved);
+  state.memberRows = rows.map(function(row, index) {
+    return Object.assign({}, row, { __sheetOrder: index + 1 });
+  });
+  updateUnsavedContext('memberOrder', getMemberOrderSnapshot());
+  renderMemberTable();
+}
+
+async function reloadMemberMaster() {
+  if (hasUnsavedChanges('memberOrder') && !window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+  await loadUsers();
+  await loadMemberMaster({ force: true });
+}
+
+async function saveMemberOrder() {
+  if (!state.currentUser) return showToast('利用者を選択してください', 'error');
+  if (!canReorderMembers()) return showToast('検索中は並び順を保存できません。検索条件をクリアしてください', 'error');
+  if (!hasUnsavedChanges('memberOrder')) return showToast('保存が必要な並び替えはありません', 'success');
+  showLoading('部員の並び順を保存しています...');
+  try {
+    await apiPost('member/reorderFromAccounting', {
+      currentUser: state.currentUser,
+      names: (state.memberRows || []).map(function(row) { return row.name || ''; }).filter(Boolean)
+    });
+    clearUnsavedContext('memberOrder');
+    await loadUsers();
+    await loadMemberMaster({ force: true });
+    showToast('部員の並び順を保存しました', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function resetMemberOrder() {
+  if (!hasUnsavedChanges('memberOrder')) {
+    showToast('元に戻す並び替えはありません', 'success');
+    return;
+  }
+  state.memberRows = clonePlain(state.memberOrderInitialRows) || [];
+  clearUnsavedContext('memberOrder');
+  renderMemberTable();
+  setUnsavedBaseline('memberOrder', getMemberOrderSnapshot());
+  if (state.selectedMember) {
+    const matched = state.memberRows.find(function(row) { return row.name === state.selectedMember.name; });
+    matched ? renderMemberDetail(matched) : clearMemberDetail();
+  }
+  showToast('部員一覧の並び順を元に戻しました', 'success');
 }
 
 function clearMemberDetail() {
@@ -956,6 +1104,10 @@ function renderMemberDetail(member) {
 }
 
 function openMemberCreateModal() {
+  if (hasUnsavedChanges('memberOrder')) {
+    showToast('部員の並び順変更を先に保存するか、元に戻してください', 'error');
+    return;
+  }
   state.memberForm = { mode: 'create', originalName: '', initialMember: null };
   els.memberFormModalTitle.textContent = '部員登録';
   els.memberFormName.value = '';
@@ -964,6 +1116,10 @@ function openMemberCreateModal() {
 }
 
 function openMemberEditModal(member) {
+  if (hasUnsavedChanges('memberOrder')) {
+    showToast('部員の並び順変更を先に保存するか、元に戻してください', 'error');
+    return;
+  }
   state.memberForm = { mode: 'edit', originalName: member.name || '', initialMember: clonePlain(member) || null };
   els.memberFormModalTitle.textContent = `部員編集：${member.name || ''}`;
   els.memberFormName.value = member.name || '';
@@ -1005,6 +1161,10 @@ async function saveMember() {
 }
 
 async function deleteSelectedMember() {
+  if (hasUnsavedChanges('memberOrder')) {
+    showToast('部員の並び順変更を先に保存するか、元に戻してください', 'error');
+    return;
+  }
   if (!state.selectedMember) return;
   const name = state.selectedMember.name || '';
   if (state.currentUser && state.currentUser.name === name) {

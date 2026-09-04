@@ -1098,3 +1098,59 @@ td {
   font-size: 12px;
   line-height: 1.6;
 }
+
+
+.member-table-head-row {
+  align-items: flex-start;
+}
+
+.member-table {
+  min-width: 420px;
+}
+
+.member-drag-col {
+  width: 74px;
+  white-space: nowrap;
+}
+
+.member-sort-cell {
+  width: 74px;
+}
+
+.member-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  min-height: 34px;
+  border: 1px dashed #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: var(--primary-dark);
+  font-weight: 800;
+  cursor: grab;
+  user-select: none;
+}
+
+.member-drag-handle.disabled {
+  cursor: not-allowed;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}
+
+.member-draggable-row {
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.member-draggable-row.dragging {
+  opacity: 0.45;
+}
+
+.member-draggable-row.drag-over-top td {
+  border-top: 3px solid #2563eb;
+}
+
+.member-draggable-row.drag-over-bottom td {
+  border-bottom: 3px solid #2563eb;
+}
