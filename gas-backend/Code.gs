@@ -1172,6 +1172,8 @@ function doGet(e) {
       case 'accounting/checkTravelTransferDuplicate': return outputJson_(checkTravelTransferDuplicate_(e.parameter || {}));
       case 'accounting/listBudgetRows': return outputJson_(listBudgetRows_(e.parameter || {}));
       case 'accounting/buildSettlementSummary': return outputJson_(buildSettlementSummary_(e.parameter || {}));
+      case 'accounting/exportExpenseCsv': return outputJson_(exportExpenseCsv_(e.parameter || {}));
+      case 'accounting/exportIncomeCsv': return outputJson_(exportIncomeCsv_(e.parameter || {}));
       default: return outputJson_({ ok: false, error: 'unknown action' });
     }
   } catch (error) {
@@ -1222,6 +1224,8 @@ function doPost(e) {
 
       case 'accounting/saveBudgetRows': return outputJson_(saveBudgetRows_(payload));
       case 'accounting/generateBudgetPdf': return outputJson_(generateBudgetPdf_(payload));
+      case 'accounting/importExpenseCsv': return outputJson_(importExpenseCsv_(payload));
+      case 'accounting/importIncomeCsv': return outputJson_(importIncomeCsv_(payload));
       case 'accounting/exportSettlementSheet': return outputJson_(exportSettlementSheet_(payload));
       default: return outputJson_({ ok: false, error: 'unknown action' });
     }
@@ -3291,4 +3295,400 @@ function exportSettlementSheet_(payload) {
     expenseTotal: data.expenseTotal,
     balance: data.balance
   };
+}
+
+
+/* === CSV import/export enhancement block === */
+const ACCOUNTING_EXPENSE_CSV_HEADERS = ['伝票番号','年度','科目コード','科目名','支出日','支出金額','摘要','備考','支払先','支払状況','支払日','関連旅費管理番号','登録日時','更新日時','登録者','更新者'];
+const ACCOUNTING_INCOME_CSV_HEADERS = ['伝票番号','年度','科目コード','科目名','収入日','収入金額','摘要','備考','入金元','入金確認状況','入金確認日','登録日時','更新日時','登録者','更新者'];
+
+function exportExpenseCsv_(params) {
+  const fiscalYear = Number(trim_(params.fiscalYear));
+  if (!fiscalYear) throw new Error('年度を指定してください');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(ACCOUNTING_EXPENSE_SHEET_NAME);
+  const rows = getSheetDataObjects_(sheet, ACCOUNTING_EXPENSE_HEADERS).filter(function(row) {
+    return Number(row['年度'] || 0) === fiscalYear;
+  }).sort(function(a, b) {
+    return String(a['伝票番号'] || '').localeCompare(String(b['伝票番号'] || ''), 'ja');
+  }).map(function(row) {
+    return [
+      row['伝票番号'] || '',
+      row['年度'] || '',
+      row['科目コード'] || '',
+      row['科目名'] || '',
+      normalizeDateForCsv_(row['支出日']),
+      row['支出金額'] || '',
+      row['摘要'] || '',
+      row['備考'] || '',
+      row['支払先'] || '',
+      row['支払状況'] || '',
+      normalizeDateForCsv_(row['支払日']),
+      row['関連旅費管理番号'] || '',
+      row['登録日時'] || '',
+      row['更新日時'] || '',
+      row['登録者'] || '',
+      row['更新者'] || ''
+    ];
+  });
+  return buildCsvExportResult_(ACCOUNTING_EXPENSE_CSV_HEADERS, rows, 'expense', fiscalYear);
+}
+
+function exportIncomeCsv_(params) {
+  const fiscalYear = Number(trim_(params.fiscalYear));
+  if (!fiscalYear) throw new Error('年度を指定してください');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(ACCOUNTING_INCOME_SHEET_NAME);
+  const rows = getSheetDataObjects_(sheet, ACCOUNTING_INCOME_HEADERS).filter(function(row) {
+    return Number(row['年度'] || 0) === fiscalYear;
+  }).sort(function(a, b) {
+    return String(a['伝票番号'] || '').localeCompare(String(b['伝票番号'] || ''), 'ja');
+  }).map(function(row) {
+    return [
+      row['伝票番号'] || '',
+      row['年度'] || '',
+      row['科目コード'] || '',
+      row['科目名'] || '',
+      normalizeDateForCsv_(row['収入日']),
+      row['収入金額'] || '',
+      row['摘要'] || '',
+      row['備考'] || '',
+      row['入金元'] || '',
+      row['入金確認状況'] || '',
+      normalizeDateForCsv_(row['入金確認日']),
+      row['登録日時'] || '',
+      row['更新日時'] || '',
+      row['登録者'] || '',
+      row['更新者'] || ''
+    ];
+  });
+  return buildCsvExportResult_(ACCOUNTING_INCOME_CSV_HEADERS, rows, 'income', fiscalYear);
+}
+
+function buildCsvExportResult_(headers, rows, prefix, fiscalYear) {
+  const csv = buildCsvString_([headers].concat(rows || []));
+  const blob = Utilities.newBlob(csv, 'text/csv', prefix + '_fy' + fiscalYear + '.csv');
+  return {
+    ok: true,
+    fiscalYear: fiscalYear,
+    fileName: blob.getName(),
+    mimeType: 'text/csv',
+    csvBase64: Utilities.base64Encode(blob.getBytes())
+  };
+}
+
+function buildCsvString_(rows) {
+  const lines = (rows || []).map(function(row) {
+    return (row || []).map(function(value) {
+      return escapeCsvCell_(value);
+    }).join(',');
+  });
+  return '\ufeff' + lines.join('\r\n') + '\r\n';
+}
+
+function escapeCsvCell_(value) {
+  const text = String(value === undefined || value === null ? '' : value).replace(/"/g, '""');
+  return /[",\r\n]/.test(text) ? '"' + text + '"' : text;
+}
+
+function normalizeDateForCsv_(value) {
+  if (!value) return '';
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, APP_TIMEZONE, 'yyyy/MM/dd');
+  }
+  const text = trim_(value);
+  return text ? text.replace(/-/g, '/') : '';
+}
+
+function importExpenseCsv_(payload) {
+  return importAccountingCsvCore_(payload, {
+    label: '支出',
+    type: 'expense',
+    headers: ACCOUNTING_EXPENSE_CSV_HEADERS,
+    sheetName: ACCOUNTING_EXPENSE_SHEET_NAME,
+    sheetHeaders: ACCOUNTING_EXPENSE_HEADERS,
+    prefix: EXPENSE_VOUCHER_PREFIX,
+    dateKey: '支出日',
+    amountKey: '支出金額',
+    counterpartyKey: '支払先',
+    statusKey: '支払状況',
+    paymentDateKey: '支払日',
+    extraKey: '関連旅費管理番号',
+    defaultStatus: '未払',
+    typeValue: '支出'
+  });
+}
+
+function importIncomeCsv_(payload) {
+  return importAccountingCsvCore_(payload, {
+    label: '収入',
+    type: 'income',
+    headers: ACCOUNTING_INCOME_CSV_HEADERS,
+    sheetName: ACCOUNTING_INCOME_SHEET_NAME,
+    sheetHeaders: ACCOUNTING_INCOME_HEADERS,
+    prefix: INCOME_VOUCHER_PREFIX,
+    dateKey: '収入日',
+    amountKey: '収入金額',
+    counterpartyKey: '入金元',
+    statusKey: '入金確認状況',
+    paymentDateKey: '入金確認日',
+    extraKey: '',
+    defaultStatus: '未確認',
+    typeValue: '収入'
+  });
+}
+
+function importAccountingCsvCore_(payload, config) {
+  const currentUser = validateCurrentUser_(payload.currentUser);
+  const csvText = String(payload.csvText || '');
+  if (!trim_(csvText)) throw new Error(config.label + 'CSVの内容が空です');
+
+  const parsed = parseAccountingCsvText_(csvText);
+  const headerRow = parsed.headers;
+  const rows = parsed.rows;
+  const validate = validateCsvHeaders_(headerRow, config.headers);
+  if (validate.missing.length) {
+    throw new Error('CSVヘッダーが不足しています: ' + validate.missing.join(' / '));
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(config.sheetName);
+  const headerMap = getHeaderMap_(config.sheetHeaders);
+  const subjectMap = getSubjectCodeMap_(config.typeValue);
+  const existingVoucherNos = getExistingVoucherNoSet_(sheet, config.sheetHeaders);
+  const fileVoucherNos = {};
+  const results = [];
+  const warnings = [];
+  const errors = [];
+  let importedCount = 0;
+
+  rows.forEach(function(rowValues, index) {
+    const rowNumber = index + 2;
+    const rowObj = mapCsvRowToObject_(headerRow, rowValues);
+    if (isCsvRowEmpty_(rowObj)) return;
+
+    try {
+      const normalized = normalizeImportRow_(rowObj, config, subjectMap, currentUser.name);
+      const voucherNo = normalizeVoucherNoForImport_(normalized.voucherNo, config.prefix, normalized.fiscalYear, sheet, fileVoucherNos, existingVoucherNos, rowNumber);
+      const warningsForRow = [];
+
+      if (normalized.subjectNameInput && normalized.subjectNameInput !== normalized.subjectName) {
+        warningsForRow.push('科目名はマスタ値「' + normalized.subjectName + '」を採用しました');
+      }
+      const expectedFiscalYear = calcFiscalYear(normalized.dateValue);
+      if (Number(expectedFiscalYear || 0) !== Number(normalized.fiscalYear || 0)) {
+        warningsForRow.push(config.dateKey + ' から計算した年度は ' + expectedFiscalYear + ' です');
+      }
+
+      const sheetRow = buildImportSheetRow_(voucherNo, normalized, config, currentUser.name);
+      const targetRow = findFirstEmptyRowByColumn_(sheet, 1, 2);
+      sheet.getRange(targetRow, 1, 1, config.sheetHeaders.length).setValues([sheetRow]);
+      existingVoucherNos[voucherNo] = true;
+      fileVoucherNos[voucherNo] = true;
+      importedCount += 1;
+      results.push({ rowNumber: rowNumber, voucherNo: voucherNo, status: 'success' });
+      warningsForRow.forEach(function(message) {
+        warnings.push({ rowNumber: rowNumber, voucherNo: voucherNo, message: message });
+      });
+    } catch (error) {
+      errors.push({ rowNumber: rowNumber, message: error.message });
+      results.push({ rowNumber: rowNumber, status: 'error', message: error.message });
+    }
+  });
+
+  return {
+    ok: true,
+    type: config.type,
+    fileName: trim_(payload.fileName),
+    importedCount: importedCount,
+    errorCount: errors.length,
+    warningCount: warnings.length,
+    totalRows: rows.length,
+    message: config.label + 'CSVの取込が完了しました。成功 ' + importedCount + '件 / エラー ' + errors.length + '件 / 警告 ' + warnings.length + '件',
+    errors: errors,
+    warnings: warnings,
+    results: results
+  };
+}
+
+function parseAccountingCsvText_(csvText) {
+  const normalized = String(csvText || '').replace(/^\ufeff/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const rows = Utilities.parseCsv(normalized, ',');
+  if (!rows || !rows.length) throw new Error('CSVを解析できませんでした');
+  const headers = (rows[0] || []).map(function(value) { return trim_(value); });
+  const body = rows.slice(1);
+  return { headers: headers, rows: body };
+}
+
+function validateCsvHeaders_(actualHeaders, expectedHeaders) {
+  const missing = (expectedHeaders || []).filter(function(name) {
+    return actualHeaders.indexOf(name) === -1;
+  });
+  return { missing: missing };
+}
+
+function mapCsvRowToObject_(headers, values) {
+  const obj = {};
+  (headers || []).forEach(function(header, index) {
+    obj[header] = index < values.length ? values[index] : '';
+  });
+  return obj;
+}
+
+function isCsvRowEmpty_(rowObj) {
+  return Object.keys(rowObj || {}).every(function(key) {
+    return trim_(rowObj[key]) === '';
+  });
+}
+
+function getSubjectCodeMap_(type) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(ACCOUNTING_SUBJECT_SHEET_NAME);
+  const rows = getSheetDataObjects_(sheet, ACCOUNTING_SUBJECT_HEADERS);
+  const map = {};
+  rows.forEach(function(row) {
+    if (trim_(row['収支区分']) !== type) return;
+    if (String(row['使用可否']) === 'false') return;
+    map[trim_(row['科目コード'])] = row;
+  });
+  return map;
+}
+
+function getExistingVoucherNoSet_(sheet, headers) {
+  const set = {};
+  getSheetDataObjects_(sheet, headers).forEach(function(row) {
+    const voucherNo = trim_(row['伝票番号']);
+    if (voucherNo) set[voucherNo] = true;
+  });
+  return set;
+}
+
+function normalizeImportRow_(rowObj, config, subjectMap, currentUserName) {
+  const fiscalYear = Number(trim_(rowObj['年度']));
+  const subjectCode = trim_(rowObj['科目コード']);
+  const subject = subjectMap[subjectCode];
+  const dateValue = normalizeImportDateValue_(rowObj[config.dateKey], config.dateKey);
+  const amount = toNumber_(rowObj[config.amountKey]);
+  const summary = trim_(rowObj['摘要']);
+  const counterparty = trim_(rowObj[config.counterpartyKey]);
+  if (!fiscalYear) throw new Error('年度が不正です');
+  if (!subjectCode) throw new Error('科目コードが未入力です');
+  if (!subject) throw new Error('科目コード「' + subjectCode + '」が ' + config.label + '科目マスタに存在しません');
+  if (!dateValue) throw new Error(config.dateKey + ' が未入力です');
+  if (amount <= 0) throw new Error(config.amountKey + ' は0より大きい値を入力してください');
+  if (!summary) throw new Error('摘要が未入力です');
+  if (!counterparty) throw new Error(config.counterpartyKey + ' が未入力です');
+
+  return {
+    voucherNo: trim_(rowObj['伝票番号']),
+    fiscalYear: fiscalYear,
+    subjectCode: subjectCode,
+    subjectName: trim_(subject['科目名']),
+    subjectNameInput: trim_(rowObj['科目名']),
+    dateValue: dateValue,
+    amount: amount,
+    summary: summary,
+    note: trim_(rowObj['備考']),
+    counterparty: counterparty,
+    status: trim_(rowObj[config.statusKey]) || config.defaultStatus,
+    paymentDate: normalizeOptionalImportDateValue_(rowObj[config.paymentDateKey]),
+    extraValue: config.extraKey ? trim_(rowObj[config.extraKey]) : '',
+    createdAt: trim_(rowObj['登録日時']) || nowString_(),
+    updatedAt: trim_(rowObj['更新日時']) || nowString_(),
+    createdBy: trim_(rowObj['登録者']) || currentUserName,
+    updatedBy: trim_(rowObj['更新者']) || currentUserName
+  };
+}
+
+function normalizeImportDateValue_(value, keyName) {
+  const text = trim_(value).replace(/-/g, '/');
+  if (!text) return '';
+  const match = text.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  if (!match) throw new Error(keyName + ' は yyyy/MM/dd 形式で入力してください');
+  const yyyy = match[1];
+  const mm = ('0' + Number(match[2])).slice(-2);
+  const dd = ('0' + Number(match[3])).slice(-2);
+  return yyyy + '/' + mm + '/' + dd;
+}
+
+function normalizeOptionalImportDateValue_(value) {
+  const text = trim_(value);
+  return text ? normalizeImportDateValue_(text, '日付') : '';
+}
+
+function normalizeVoucherNoForImport_(voucherNo, prefix, fiscalYear, sheet, fileVoucherNos, existingVoucherNos, rowNumber) {
+  const text = trim_(voucherNo);
+  if (!text) {
+    const generated = generateAccountingId_(prefix, fiscalYear, sheet, 1);
+    if (fileVoucherNos[generated] || existingVoucherNos[generated]) {
+      return generateUniqueVoucherNo_(prefix, fiscalYear, fileVoucherNos, existingVoucherNos);
+    }
+    return generated;
+  }
+  if (fileVoucherNos[text]) throw new Error('同一CSV内で伝票番号が重複しています: ' + text);
+  if (existingVoucherNos[text]) throw new Error('既存データに同じ伝票番号が存在します: ' + text);
+  return text;
+}
+
+function generateUniqueVoucherNo_(prefix, fiscalYear, fileVoucherNos, existingVoucherNos) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetName = prefix === EXPENSE_VOUCHER_PREFIX ? ACCOUNTING_EXPENSE_SHEET_NAME : ACCOUNTING_INCOME_SHEET_NAME;
+  const sheet = ss.getSheetByName(sheetName);
+  for (var i = 0; i < 1000; i += 1) {
+    var candidate = generateAccountingId_(prefix, fiscalYear, sheet, 1);
+    if (!fileVoucherNos[candidate] && !existingVoucherNos[candidate]) return candidate;
+  }
+  throw new Error('伝票番号の自動採番に失敗しました');
+}
+
+function buildImportSheetRow_(voucherNo, normalized, config) {
+  if (config.type === 'expense') {
+    return [
+      voucherNo,
+      normalized.fiscalYear,
+      normalized.subjectCode,
+      normalized.subjectName,
+      normalized.dateValue,
+      normalized.amount,
+      normalized.summary,
+      normalized.note,
+      normalized.counterparty,
+      normalized.status,
+      normalized.paymentDate,
+      normalized.extraValue,
+      false,
+      '',
+      '',
+      '',
+      '',
+      '',
+      normalized.createdAt,
+      normalized.updatedAt,
+      normalized.createdBy,
+      normalized.updatedBy
+    ];
+  }
+  return [
+    voucherNo,
+    normalized.fiscalYear,
+    normalized.subjectCode,
+    normalized.subjectName,
+    normalized.dateValue,
+    normalized.amount,
+    normalized.summary,
+    normalized.note,
+    normalized.counterparty,
+    normalized.status,
+    normalized.paymentDate,
+    false,
+    '',
+    '',
+    '',
+    '',
+    '',
+    normalized.createdAt,
+    normalized.updatedAt,
+    normalized.createdBy,
+    normalized.updatedBy
+  ];
 }
